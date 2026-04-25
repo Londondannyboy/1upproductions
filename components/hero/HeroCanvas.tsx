@@ -16,7 +16,7 @@ function CameraController({ scrollProgress }: { scrollProgress: number }) {
     let posZ: number, posY: number, lookZ: number, lookY: number, lookX = 0;
     const bob = Math.sin(t * 4.5) * 0.05;
 
-    // Camera path based on scroll progress (7 phases including stadium)
+    // Camera path based on scroll progress (5 phases)
     if (p < 0.32) {
       // Phase 1: Tunnel walk (0-32%)
       const s = p / 0.32;
@@ -38,41 +38,21 @@ function CameraController({ scrollProgress }: { scrollProgress: number }) {
       posY = THREE.MathUtils.lerp(1.7, 2.3, s);
       lookZ = THREE.MathUtils.lerp(10, 16, s);
       lookY = THREE.MathUtils.lerp(3.2, 5.5, s);
-    } else if (p < 0.75) {
-      // Phase 4: On stage / broadcast (65-75%)
+    } else if (p < 0.82) {
+      // Phase 4: On stage / broadcast (65-82%)
+      const s = (p - 0.65) / 0.17;
       posZ = 7.8 + Math.sin(t * 0.6) * 0.15;
       posY = 2.3 + Math.sin(t * 0.4) * 0.05;
       lookZ = 16;
       lookY = 5.8;
       lookX = Math.sin(t * 0.5) * 0.5;
-    } else if (p < 0.95) {
-      // Phase 5: Stadium exploration (75-95%) - immersive esports stadium experience
-      const s = (p - 0.75) / 0.20;
-      const angle = s * Math.PI * 0.8 - Math.PI * 0.4; // Sweep around stadium
-      const radius = 20;
-      const x = Math.cos(angle) * radius;
-      const z = Math.sin(angle) * radius + 25;
-      
-      camera.position.set(x, 10 + Math.sin(s * Math.PI * 2) * 2, z);
-      
-      // Look at different video screens as we move
-      const targetScreens = [
-        [-18, 12, 25], // Left main screen
-        [0, 15, 35],   // Center main screen
-        [18, 12, 25],  // Right main screen
-      ];
-      const screenIndex = Math.floor(s * targetScreens.length) % targetScreens.length;
-      const targetScreen = targetScreens[screenIndex];
-      
-      camera.lookAt(targetScreen[0], targetScreen[1], targetScreen[2]);
-      return null; // Skip the normal camera positioning below
     } else {
-      // Phase 7: Final pullback (95-100%)
-      const s = (p - 0.95) / 0.05;
-      posZ = THREE.MathUtils.lerp(15, 5, s);
-      posY = THREE.MathUtils.lerp(8, 12, s);
-      lookZ = THREE.MathUtils.lerp(25, 20, s);
-      lookY = THREE.MathUtils.lerp(6, 8, s);
+      // Phase 5: Pull back / fade (82-100%)
+      const s = (p - 0.82) / 0.18;
+      posZ = THREE.MathUtils.lerp(7.8, 12, s);
+      posY = THREE.MathUtils.lerp(2.3, 8, s);
+      lookZ = THREE.MathUtils.lerp(16, 20, s);
+      lookY = THREE.MathUtils.lerp(5.8, 6, s);
     }
 
     // Apply camera position with subtle breathing motion

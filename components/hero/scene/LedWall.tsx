@@ -37,7 +37,7 @@ function drawLED(ctx: CanvasRenderingContext2D, p: number, t: number, w: number,
   }
 }
 
-export function LedWall() {
+export function LedWall({ scrollProgress }: { scrollProgress: number }) {
   const meshRef = useRef<THREE.Mesh>(null);
   
   const [canvas] = useState(() => {
@@ -55,13 +55,30 @@ export function LedWall() {
 
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
-    // This should use scroll progress in actual implementation
-    const p = Math.max(0, Math.min(1, t * 0.1)); // Placeholder
     
     const ctx = canvas.getContext('2d');
     if (ctx) {
-      drawLED(ctx, p, t, canvas.width, canvas.height);
+      drawLED(ctx, scrollProgress, t, canvas.width, canvas.height);
       texture.needsUpdate = true;
+    }
+  });
+
+  useFrame(() => {
+    // Curve the LED wall geometry
+    if (meshRef.current && meshRef.current.geometry.attributes.position) {
+      const positions = meshRef.current.geometry.attributes.position;
+      const vertex = new THREE.Vector3();
+      
+      for (let i = 0; i < positions.count; i++) {
+        vertex.fromBufferAttribute(positions, i);
+        // Apply curvature: push vertices back based on X distance from center
+        const curvature = 0.08;
+        vertex.z -= Math.abs(vertex.x) * curvature;
+        positions.setXYZ(i, vertex.x, vertex.y, vertex.z);
+      }
+      
+      positions.needsUpdate = true;
+      meshRef.current.geometry.computeVertexNormals();
     }
   });
 

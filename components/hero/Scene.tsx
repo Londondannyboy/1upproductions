@@ -11,8 +11,6 @@ import { Crowd } from './scene/Crowd';
 import { BroadcastCameras } from './scene/BroadcastCameras';
 import { TunnelMonitors } from './scene/TunnelMonitors';
 import { FloorPanels } from './scene/FloorPanels';
-// import { EsportsStadium } from './scene/EsportsStadium';
-// import { StadiumHotspots } from './StadiumHotspots';
 
 import { VIDEO_SOURCES, makeVideoEl } from '@/lib/videoSources';
 import { drawBackstageFeed } from '@/components/feeds/feedCanvases/drawBackstageFeed';
@@ -28,6 +26,20 @@ export function Scene({ scrollProgress }: { scrollProgress: number }) {
   
   const [backstageTexture, setBackstageTexture] = useState<THREE.Texture | null>(null);
   const [floorVideoTexture, setFloorVideoTexture] = useState<THREE.Texture | null>(null);
+  
+  // Backstage feed canvas for CCTV overlay
+  const [backstageCanvas] = useState(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 768;
+    canvas.height = 432;
+    return canvas;
+  });
+  
+  const [backstageFeedTexture] = useState(() => {
+    const texture = new THREE.CanvasTexture(backstageCanvas);
+    texture.minFilter = THREE.LinearFilter;
+    return texture;
+  });
   
   // Initialize video elements
   useEffect(() => {
@@ -100,6 +112,13 @@ export function Scene({ scrollProgress }: { scrollProgress: number }) {
     const t = clock.getElapsedTime();
     const stageIntensity = smoothstep(0.45, 0.75, scrollProgress);
     
+    // Update backstage feed canvas with CCTV overlay
+    const ctx = backstageCanvas.getContext('2d');
+    if (ctx) {
+      drawBackstageFeed(ctx, t, backstageCanvas.width, backstageCanvas.height, backstageVideo);
+      backstageFeedTexture.needsUpdate = true;
+    }
+    
     // Update lighting intensities based on scroll progress
     const spotLights = groupRef.current?.parent?.children.filter(
       (child) => child instanceof THREE.SpotLight
@@ -134,7 +153,7 @@ export function Scene({ scrollProgress }: { scrollProgress: number }) {
       
       <Tunnel />
       <Stage />
-      <LedWall />
+      <LedWall scrollProgress={scrollProgress} />
       <Truss />
       <LightCones scrollProgress={scrollProgress} />
       <Crowd />
@@ -142,10 +161,8 @@ export function Scene({ scrollProgress }: { scrollProgress: number }) {
         scrollProgress={scrollProgress} 
         cameraPosition={camera.position}
       />
-      <TunnelMonitors backstageFeedTexture={backstageTexture || undefined} />
+      <TunnelMonitors backstageFeedTexture={backstageFeedTexture} />
       <FloorPanels floorVideoTexture={floorVideoTexture || undefined} />
-      {/* <EsportsStadium scrollProgress={scrollProgress} /> */}
-      {/* <StadiumHotspots scrollProgress={scrollProgress} /> */}
     </group>
   );
 }
