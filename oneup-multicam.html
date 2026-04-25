@@ -1,0 +1,2451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>1UP — Live → The Reel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;700&family=Inter+Tight:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root {
+    --bg: #050507;
+    --bg-2: #0b0b10;
+    --surface: #0e0e12;
+    --line: #1d1d23;
+    --text: #f4f4f0;
+    --text-dim: #8b8b94;
+    --text-faint: #4a4a52;
+    --accent: #ff2d20;
+    --accent-glow: rgba(255, 45, 32, 0.5);
+    --serif: 'Instrument Serif', Georgia, serif;
+    --sans: 'Inter Tight', -apple-system, system-ui, sans-serif;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--sans); background: var(--bg); color: var(--text);
+    overflow-x: hidden; line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: var(--accent); color: var(--bg); }
+
+  /* ════════ 3D LAYER ════════ */
+  .canvas-stage {
+    position: fixed; inset: 0; z-index: 0;
+    background: #000;
+    transition: opacity .8s ease-out;
+  }
+  .canvas-stage.is-done { opacity: 0; pointer-events: none; }
+  .canvas-stage canvas { display: block; width: 100%; height: 100%; }
+
+  /* film-grain */
+  .grain {
+    position: fixed; inset: 0; z-index: 60; pointer-events: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.07 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    mix-blend-mode: overlay; opacity: 0.4;
+  }
+
+  /* tally flash */
+  .tally-flash {
+    position: fixed; inset: 0; z-index: 70; pointer-events: none;
+    background: var(--accent); opacity: 0;
+    transition: opacity .15s;
+  }
+
+  /* ════════ TOP NAV ════════ */
+  .top-bar {
+    position: fixed; top: 0; left: 0; right: 0;
+    z-index: 50; padding: 18px 32px;
+    display: flex; align-items: center; justify-content: space-between;
+    pointer-events: none;
+  }
+  .top-bar > * { pointer-events: auto; }
+  .brand {
+    font-family: var(--serif); font-style: italic;
+    font-size: 26px; color: var(--text); text-decoration: none;
+    display: inline-flex; align-items: baseline; gap: 6px;
+  }
+  .brand .num { font-family: var(--sans); font-style: normal; font-weight: 800; font-size: 22px; }
+  .top-status {
+    font-family: var(--mono); font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.18em; color: var(--text-dim);
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .top-status::before {
+    content: ""; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent); box-shadow: 0 0 10px var(--accent-glow);
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.85); }
+  }
+  .skip-btn {
+    position: fixed; top: 18px; right: 32px; z-index: 51;
+    background: rgba(8,8,10,0.55); backdrop-filter: blur(12px);
+    border: 1px solid var(--line); color: var(--text);
+    font-family: var(--mono); font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.15em;
+    padding: 10px 16px; cursor: pointer; border-radius: 999px;
+    transition: all .2s;
+  }
+  .skip-btn:hover { border-color: var(--text-dim); background: rgba(20,20,24,0.85); }
+
+  /* ════════ SCENE OVERLAYS ════════ */
+  .scene-overlay {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 20; pointer-events: none;
+    opacity: 0; transition: opacity .6s ease-out;
+  }
+  .scene-overlay.show { opacity: 1; }
+  .scene-text { text-align: center; padding: 0 32px; }
+  .scene-eyebrow {
+    font-family: var(--mono); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.25em; color: var(--text-dim);
+    margin-bottom: 24px;
+    display: inline-flex; align-items: center; gap: 16px;
+  }
+  .scene-eyebrow .bar { width: 32px; height: 1px; background: var(--accent); }
+  .scene-title {
+    font-family: var(--serif); font-weight: 400;
+    font-size: clamp(56px, 9vw, 144px);
+    line-height: 0.95; letter-spacing: -0.025em;
+  }
+  .scene-title em { color: var(--accent); font-style: italic; }
+  .scene-title .dim { color: var(--text-dim); font-style: italic; }
+  .scene-sub {
+    margin-top: 24px;
+    font-family: var(--mono); font-size: 12px;
+    text-transform: uppercase; letter-spacing: 0.2em; color: var(--text-dim);
+  }
+  .countdown {
+    font-family: var(--sans); font-weight: 800;
+    font-size: clamp(180px, 26vw, 420px);
+    line-height: 0.85; color: var(--text);
+    text-align: center; font-feature-settings: 'tnum';
+  }
+  .countdown.flash { color: var(--accent); text-shadow: 0 0 60px var(--accent-glow); }
+
+  /* ════════ BROADCAST UI ════════ */
+  .broadcast-ui {
+    position: fixed; inset: 0; z-index: 30; pointer-events: none;
+    opacity: 0; transition: opacity .4s;
+  }
+  .broadcast-ui.show { opacity: 1; }
+  .bc-corner-tl { position: absolute; top: 60px; left: 32px; display: flex; align-items: center; gap: 12px; }
+  .bc-live {
+    background: var(--accent); color: var(--bg);
+    font-family: var(--mono); font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.18em;
+    padding: 6px 12px;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .bc-live::before {
+    content: ""; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--bg); animation: pulse 1s ease-in-out infinite;
+  }
+  .bc-network {
+    font-family: var(--mono); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.18em;
+    color: var(--text); text-shadow: 0 1px 8px rgba(0,0,0,0.8);
+  }
+  .bc-corner-tr {
+    position: absolute; top: 60px; right: 32px; text-align: right;
+    font-family: var(--mono); font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.15em;
+    color: var(--text); text-shadow: 0 1px 6px rgba(0,0,0,0.8);
+    line-height: 1.6;
+  }
+  .bc-corner-tr .tc { color: var(--accent); font-weight: 700; }
+  .bc-chyron {
+    position: absolute; bottom: 40px; left: 0; right: 0; height: 44px;
+    background: linear-gradient(90deg, var(--accent) 0%, var(--accent) 200px, transparent 200px),
+                linear-gradient(90deg, transparent, rgba(0,0,0,0.7) 200px);
+    display: flex; align-items: center; overflow: hidden;
+  }
+  .bc-chyron-tag {
+    width: 200px; flex-shrink: 0;
+    font-family: var(--mono); font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.15em;
+    color: var(--bg); padding-left: 32px; z-index: 2;
+  }
+  .bc-chyron-track { flex: 1; position: relative; height: 100%; display: flex; align-items: center; overflow: hidden; }
+  .bc-chyron-track .crawl {
+    display: flex; gap: 48px; white-space: nowrap;
+    font-family: var(--mono); font-size: 13px; font-weight: 500;
+    color: var(--text);
+    animation: crawl 30s linear infinite; padding-left: 24px;
+  }
+  .bc-chyron-track .crawl span::after { content: " ✦"; color: var(--accent); margin-left: 24px; }
+  @keyframes crawl { to { transform: translateX(-50%); } }
+
+  .scroll-track { height: 500vh; position: relative; z-index: 10; }
+
+  /* ════════ HOTSPOTS (clickable in-scene markers) ════════ */
+  .hotspots {
+    position: fixed; inset: 0; z-index: 25;
+    pointer-events: none;
+  }
+  .hotspot {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    pointer-events: auto;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity .3s;
+  }
+  .hotspot.visible { opacity: 1; }
+  .hotspot-dot {
+    width: 22px; height: 22px;
+    border: 1px solid var(--accent);
+    border-radius: 50%;
+    background: rgba(255, 45, 32, 0.15);
+    backdrop-filter: blur(4px);
+    position: relative;
+    transition: all .25s;
+  }
+  .hotspot-dot::before {
+    content: "";
+    position: absolute; inset: -4px;
+    border: 1px solid var(--accent);
+    border-radius: 50%;
+    opacity: 0.6;
+    animation: hotspotRing 2.4s ease-out infinite;
+  }
+  .hotspot-dot::after {
+    content: "";
+    position: absolute; inset: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 10px var(--accent-glow);
+  }
+  @keyframes hotspotRing {
+    0% { transform: scale(1); opacity: 0.7; }
+    100% { transform: scale(2.6); opacity: 0; }
+  }
+  .hotspot-label {
+    position: absolute;
+    top: 50%; left: calc(100% + 14px);
+    transform: translateY(-50%);
+    white-space: nowrap;
+    background: rgba(8,8,10,0.85);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--line);
+    padding: 8px 14px;
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--text);
+    transition: all .2s;
+  }
+  .hotspot-label .pre {
+    color: var(--accent);
+    margin-right: 8px;
+    font-weight: 700;
+  }
+  .hotspot:hover .hotspot-dot {
+    background: var(--accent);
+    transform: scale(1.15);
+  }
+  .hotspot:hover .hotspot-label {
+    border-color: var(--accent);
+    color: var(--text);
+  }
+
+  /* ════════ FEED VIEWER MODAL ════════ */
+  .feed-viewer {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(2, 2, 4, 0.92);
+    backdrop-filter: blur(12px);
+    display: flex; flex-direction: column;
+    opacity: 0; pointer-events: none;
+    transition: opacity .4s;
+  }
+  .feed-viewer.open { opacity: 1; pointer-events: auto; }
+
+  .fv-bar {
+    padding: 18px 32px;
+    border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .fv-bar-left {
+    display: flex; align-items: center; gap: 16px;
+  }
+  .fv-pill {
+    background: var(--accent); color: var(--bg);
+    font-family: var(--mono); font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.18em;
+    padding: 5px 10px;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .fv-pill::before {
+    content: ""; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--bg); animation: pulse 1s ease-in-out infinite;
+  }
+  .fv-title {
+    font-family: var(--mono); font-size: 12px;
+    text-transform: uppercase; letter-spacing: 0.18em; color: var(--text);
+  }
+  .fv-loc {
+    font-family: var(--mono); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-dim);
+  }
+  .fv-bar-right {
+    display: flex; align-items: center; gap: 16px;
+    font-family: var(--mono); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.15em;
+    color: var(--text-dim);
+  }
+  .fv-tc {
+    color: var(--accent); font-weight: 700;
+    min-width: 110px; text-align: right;
+  }
+  .fv-close {
+    width: 36px; height: 36px;
+    border: 1px solid var(--line); background: transparent;
+    color: var(--text); cursor: pointer;
+    border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    transition: all .2s;
+  }
+  .fv-close:hover { border-color: var(--accent); color: var(--accent); }
+
+  .fv-stage {
+    flex: 1;
+    display: flex; align-items: center; justify-content: center;
+    padding: 32px;
+    position: relative;
+  }
+  .fv-frame {
+    position: relative;
+    width: 100%; max-width: 1400px;
+    aspect-ratio: 16 / 9;
+    background: #000;
+    border: 1px solid var(--line);
+    overflow: hidden;
+  }
+  .fv-frame canvas { width: 100%; height: 100%; display: block; object-fit: cover; }
+  .fv-frame::after {
+    content: "";
+    position: absolute; inset: 0; pointer-events: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.07 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    mix-blend-mode: overlay; opacity: 0.4;
+  }
+  .fv-corner {
+    position: absolute; width: 24px; height: 24px;
+    border: 1px solid var(--accent); z-index: 3; pointer-events: none;
+  }
+  .fv-corner.tl { top: 14px; left: 14px; border-right: 0; border-bottom: 0; }
+  .fv-corner.tr { top: 14px; right: 14px; border-left: 0; border-bottom: 0; }
+  .fv-corner.bl { bottom: 14px; left: 14px; border-right: 0; border-top: 0; }
+  .fv-corner.br { bottom: 14px; right: 14px; border-left: 0; border-top: 0; }
+
+  .fv-multicam {
+    padding: 16px 32px 24px;
+    border-top: 1px solid var(--line);
+  }
+  .fv-multicam-label {
+    font-family: var(--mono); font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.2em; color: var(--text-dim);
+    margin-bottom: 12px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .fv-multicam-label::before {
+    content: ""; width: 24px; height: 1px; background: var(--accent);
+  }
+  .fv-thumbs {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+  }
+  .fv-thumb {
+    background: #000;
+    border: 1px solid var(--line);
+    aspect-ratio: 16 / 9;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: border-color .2s;
+  }
+  .fv-thumb:hover { border-color: var(--text-dim); }
+  .fv-thumb.active { border-color: var(--accent); }
+  .fv-thumb canvas { width: 100%; height: 100%; display: block; object-fit: cover; }
+  .fv-thumb-tag {
+    position: absolute; top: 6px; left: 6px;
+    font-family: var(--mono); font-size: 8px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.15em;
+    color: var(--text);
+    background: rgba(8,8,10,0.85);
+    padding: 3px 6px;
+    z-index: 2;
+  }
+  .fv-thumb.active .fv-thumb-tag { background: var(--accent); color: var(--bg); }
+  .fv-thumb-live {
+    position: absolute; top: 6px; right: 6px;
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 6px var(--accent-glow);
+    animation: pulse 1.4s ease-in-out infinite;
+    z-index: 2;
+  }
+
+  @media (max-width: 900px) {
+    .fv-thumbs { grid-template-columns: repeat(3, 1fr); }
+    .fv-bar { padding: 12px 16px; flex-wrap: wrap; gap: 8px; }
+    .fv-bar-right .fv-tc { display: none; }
+    .hotspot-label { font-size: 9px; padding: 6px 10px; }
+  }
+
+  .scroll-progress {
+    position: fixed; right: 12px; top: 50%; transform: translateY(-50%);
+    z-index: 50; width: 2px; height: 200px;
+    background: rgba(255,255,255,0.08);
+  }
+  .scroll-progress .fill {
+    width: 100%; height: 0;
+    background: var(--accent); box-shadow: 0 0 8px var(--accent-glow);
+  }
+
+  /* ════════ ROLL VT TRANSITION ════════ */
+  .roll-vt {
+    position: relative; z-index: 10;
+    background: #000;
+    height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    text-align: center;
+    overflow: hidden;
+  }
+  /* SMPTE-style flash bars */
+  .roll-vt::before {
+    content: "";
+    position: absolute; left: 0; right: 0; top: 50%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    transform: translateY(-50%) scaleX(0);
+    animation: smpte-bar 1.2s ease-out 0.3s forwards;
+  }
+  @keyframes smpte-bar {
+    to { transform: translateY(-50%) scaleX(1); }
+  }
+  .roll-vt-inner {
+    z-index: 2;
+    display: grid;
+    grid-template-columns: auto auto auto;
+    gap: 64px;
+    align-items: center;
+  }
+  .vt-cue {
+    text-align: left;
+  }
+  .vt-cue .label {
+    font-family: var(--mono); font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.25em;
+    color: var(--text-faint);
+    margin-bottom: 6px;
+  }
+  .vt-cue .value {
+    font-family: var(--mono); font-size: 18px; font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+  }
+  .vt-cue.center {
+    font-family: var(--serif); font-style: italic;
+    font-size: clamp(64px, 9vw, 140px);
+    line-height: 0.9;
+    color: var(--text);
+    text-align: center;
+  }
+  .vt-cue.center span { display: block; font-size: 0.3em; font-style: normal; font-family: var(--mono); letter-spacing: 0.3em; color: var(--text-dim); margin-top: 16px; }
+
+  /* ════════ THE REEL (video player) ════════ */
+  .reel {
+    position: relative; z-index: 10;
+    background: #000;
+    padding: 80px 0 120px;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+  .reel-head {
+    padding: 0 32px 48px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: end;
+    gap: 32px;
+  }
+  .reel-head .left {
+    font-family: var(--mono); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.2em;
+    color: var(--text-dim);
+  }
+  .reel-head .center {
+    font-family: var(--serif);
+    font-size: clamp(40px, 5vw, 72px);
+    line-height: 0.95;
+    text-align: center;
+    letter-spacing: -0.02em;
+  }
+  .reel-head .center em { color: var(--accent); font-style: italic; }
+  .reel-head .right {
+    font-family: var(--mono); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.2em;
+    color: var(--text-dim);
+    text-align: right;
+  }
+
+  .reel-frame {
+    position: relative;
+    margin: 0 32px;
+    background: #000;
+    border: 1px solid var(--line);
+    overflow: hidden;
+    aspect-ratio: 16 / 9;
+    max-height: 80vh;
+  }
+  .reel-frame video,
+  .reel-frame canvas {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  /* corner film-frame markers (cinematic) */
+  .reel-corner {
+    position: absolute;
+    width: 28px; height: 28px;
+    border: 1px solid var(--accent);
+    z-index: 3; pointer-events: none;
+    opacity: 0.7;
+  }
+  .reel-corner.tl { top: 16px; left: 16px; border-right: 0; border-bottom: 0; }
+  .reel-corner.tr { top: 16px; right: 16px; border-left: 0; border-bottom: 0; }
+  .reel-corner.bl { bottom: 16px; left: 16px; border-right: 0; border-top: 0; }
+  .reel-corner.br { bottom: 16px; right: 16px; border-left: 0; border-top: 0; }
+
+  /* badge in top-left of reel */
+  .reel-badge {
+    position: absolute; top: 56px; left: 56px; z-index: 4;
+    display: flex; align-items: center; gap: 12px;
+    pointer-events: none;
+  }
+  .reel-badge .live-pill {
+    background: var(--accent); color: var(--bg);
+    font-family: var(--mono); font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.18em;
+    padding: 5px 10px;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .reel-badge .live-pill::before {
+    content: ""; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--bg); animation: pulse 1s ease-in-out infinite;
+  }
+  .reel-badge .reel-title {
+    font-family: var(--mono); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.18em;
+    color: var(--text); text-shadow: 0 1px 8px rgba(0,0,0,0.8);
+  }
+
+  /* timecode top-right */
+  .reel-tc {
+    position: absolute; top: 56px; right: 56px; z-index: 4;
+    font-family: var(--mono); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.18em;
+    color: var(--accent); font-weight: 700;
+    text-shadow: 0 1px 8px rgba(0,0,0,0.8);
+    pointer-events: none;
+  }
+
+  /* custom controls */
+  .reel-controls {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    z-index: 5;
+    padding: 20px 32px;
+    background: linear-gradient(180deg, transparent, rgba(0,0,0,0.85));
+    display: flex; align-items: center; gap: 20px;
+    opacity: 0; transition: opacity .3s;
+  }
+  .reel-frame:hover .reel-controls,
+  .reel-frame.show-controls .reel-controls { opacity: 1; }
+
+  .reel-btn {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.3);
+    color: var(--text);
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: all .2s;
+  }
+  .reel-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .reel-btn svg { width: 16px; height: 16px; }
+
+  .reel-progress {
+    flex: 1; height: 3px; background: rgba(255,255,255,0.15);
+    cursor: pointer; position: relative;
+  }
+  .reel-progress .filled { height: 100%; width: 0; background: var(--accent); }
+  .reel-progress .scrub {
+    position: absolute; top: 50%; left: 0;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--accent);
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 10px var(--accent-glow);
+  }
+
+  .reel-time {
+    font-family: var(--mono); font-size: 11px;
+    color: var(--text); white-space: nowrap;
+    letter-spacing: 0.05em;
+  }
+
+  /* big play button (initial state) */
+  .reel-play-overlay {
+    position: absolute; inset: 0; z-index: 6;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.45);
+    cursor: pointer;
+    transition: opacity .4s;
+  }
+  .reel-play-overlay.gone { opacity: 0; pointer-events: none; }
+  .reel-play-overlay .play-circle {
+    width: 110px; height: 110px;
+    border: 1px solid var(--accent);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--accent);
+    transition: all .25s;
+    position: relative;
+  }
+  .reel-play-overlay:hover .play-circle {
+    background: var(--accent);
+    color: var(--bg);
+    transform: scale(1.05);
+  }
+  .reel-play-overlay .play-circle::before {
+    content: "";
+    position: absolute; inset: -8px;
+    border-radius: 50%;
+    border: 1px solid var(--accent);
+    opacity: 0.4;
+    animation: ringPulse 2s ease-out infinite;
+  }
+  @keyframes ringPulse {
+    0% { transform: scale(1); opacity: 0.5; }
+    100% { transform: scale(1.4); opacity: 0; }
+  }
+  .reel-play-overlay .play-circle svg { width: 30px; height: 30px; margin-left: 6px; }
+  .reel-play-overlay .label {
+    position: absolute; bottom: 22%;
+    font-family: var(--mono); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.25em;
+    color: var(--text);
+  }
+
+  /* film grain inside the reel only */
+  .reel-frame::after {
+    content: "";
+    position: absolute; inset: 0; pointer-events: none; z-index: 2;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    mix-blend-mode: overlay; opacity: 0.55;
+  }
+
+  .reel-foot {
+    margin: 32px 32px 0;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+    display: flex; justify-content: space-between; align-items: baseline;
+    flex-wrap: wrap; gap: 16px;
+    font-family: var(--mono); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.15em;
+    color: var(--text-dim);
+  }
+  .reel-foot strong { color: var(--text); font-weight: 500; }
+
+  /* ════════ PORTFOLIO ════════ */
+  .portfolio { position: relative; z-index: 10; background: var(--bg); }
+  .portfolio-head {
+    padding: 120px 32px 80px;
+    border-bottom: 1px solid var(--line);
+    text-align: center;
+  }
+  .portfolio-head .eyebrow {
+    font-family: var(--mono); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.25em;
+    color: var(--accent); margin-bottom: 24px;
+    display: inline-flex; align-items: center; gap: 16px;
+  }
+  .portfolio-head .eyebrow::before, .portfolio-head .eyebrow::after {
+    content: ""; width: 24px; height: 1px; background: var(--accent);
+  }
+  .portfolio-head h2 {
+    font-family: var(--serif);
+    font-size: clamp(56px, 8vw, 120px);
+    line-height: 0.95; letter-spacing: -0.025em;
+  }
+  .portfolio-head h2 em { color: var(--text-dim); font-style: italic; }
+  .portfolio-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 1px; background: var(--line); padding: 1px;
+  }
+  .pcard {
+    position: relative; aspect-ratio: 16 / 11;
+    background: var(--surface); overflow: hidden; cursor: pointer;
+    text-decoration: none; color: inherit;
+  }
+  .pcard-bg { position: absolute; inset: 0; transition: transform .6s cubic-bezier(.2,.8,.2,1); }
+  .pcard:hover .pcard-bg { transform: scale(1.04); }
+  .pcard[data-cat="esports-1"] .pcard-bg { background: linear-gradient(135deg, #1a0a2e 0%, #ff2d20 50%, #ff8a2d 100%); }
+  .pcard[data-cat="esports-2"] .pcard-bg { background: linear-gradient(135deg, #0a1a2e 0%, #2d8aff 60%, #ff2d8a 100%); }
+  .pcard[data-cat="esports-3"] .pcard-bg { background: linear-gradient(135deg, #2e0a1a 0%, #8a2dff 50%, #2dff8a 110%); }
+  .pcard[data-cat="bcast-1"]   .pcard-bg { background: linear-gradient(135deg, #1a1f2e 0%, #2a4a6a 50%, #8aa8c8 100%); }
+  .pcard[data-cat="live"]      .pcard-bg { background: linear-gradient(135deg, #0a0a0a 0%, #4a0a4a 50%, #ff00aa 100%); }
+  .pcard[data-cat="bcast-2"]   .pcard-bg { background: linear-gradient(135deg, #1a1a1a 0%, #3a2a1a 50%, #b87333 100%); }
+  .pcard-mark {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    font-family: var(--serif); font-style: italic;
+    font-size: clamp(60px, 7vw, 130px); line-height: 0.9;
+    color: rgba(255,255,255,0.1); text-align: center;
+    text-transform: uppercase; letter-spacing: -0.02em;
+    pointer-events: none; transition: color .4s;
+  }
+  .pcard:hover .pcard-mark { color: rgba(255,255,255,0.2); }
+  .pcard-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 40%, rgba(8,8,10,0.95) 100%); }
+  .pcard-info { position: absolute; bottom: 0; left: 0; right: 0; padding: 24px; }
+  .pcard-cat {
+    font-family: var(--mono); font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.18em;
+    color: var(--text-dim); margin-bottom: 6px; transition: color .3s;
+  }
+  .pcard:hover .pcard-cat { color: var(--accent); }
+  .pcard-title { font-family: var(--serif); font-size: 26px; line-height: 1.05; margin-bottom: 4px; }
+  .pcard-sub {
+    font-family: var(--mono); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-dim);
+  }
+
+  .portfolio-cta {
+    padding: 120px 32px;
+    text-align: center; border-top: 1px solid var(--line);
+  }
+  .portfolio-cta h3 {
+    font-family: var(--serif); font-size: clamp(48px, 6vw, 88px);
+    line-height: 1; margin-bottom: 32px;
+  }
+  .portfolio-cta h3 em { color: var(--accent); font-style: italic; }
+  .portfolio-cta a {
+    display: inline-flex; align-items: center; gap: 16px;
+    font-family: var(--mono); font-size: 13px;
+    text-transform: uppercase; letter-spacing: 0.2em;
+    color: var(--text); text-decoration: none;
+    border-bottom: 1px solid var(--accent);
+    padding-bottom: 8px; transition: gap .3s;
+  }
+  .portfolio-cta a:hover { gap: 24px; }
+
+  footer {
+    padding: 48px 32px;
+    border-top: 1px solid var(--line);
+    display: flex; justify-content: space-between;
+    font-family: var(--mono); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-faint);
+  }
+
+  .no-webgl .canvas-stage {
+    background: radial-gradient(ellipse at 50% 50%, var(--accent-glow), transparent 50%), var(--bg);
+  }
+  .no-webgl .scene-overlay { display: none !important; }
+  .no-webgl .scroll-track { display: none; }
+
+  @media (max-width: 900px) {
+    .portfolio-grid { grid-template-columns: 1fr; }
+    .scene-title { font-size: 56px; }
+    .countdown { font-size: 180px; }
+    .bc-corner-tr { display: none; }
+    .scroll-progress { display: none; }
+    .top-status { display: none; }
+    .reel-head { grid-template-columns: 1fr; text-align: center; }
+    .reel-head .right { text-align: center; }
+    .roll-vt-inner { grid-template-columns: 1fr; gap: 32px; }
+    .reel-frame { margin: 0 16px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═════════ FIXED LAYERS ═════════ -->
+<div class="canvas-stage" id="canvasStage"></div>
+<div class="grain"></div>
+<div class="tally-flash" id="tallyFlash"></div>
+
+<div class="top-bar">
+  <a href="#" class="brand"><span class="num">1</span>UP</a>
+  <span class="top-status" id="topStatus">On air · Scene 01</span>
+</div>
+<button class="skip-btn" id="skipBtn">Skip intro ⏭</button>
+
+<div class="scroll-progress" aria-hidden="true">
+  <div class="fill" id="progressFill"></div>
+</div>
+
+<!-- ═════════ SCENE OVERLAYS ═════════ -->
+<div class="scene-overlay" id="overlay-1"><div class="scene-text">
+  <div class="scene-eyebrow"><span class="bar"></span><span>Scene 01 · Backstage</span></div>
+  <h1 class="scene-title"><span class="dim">In three.</span></h1>
+  <div class="scene-sub">Standby — comms hot — talent walking.</div>
+</div></div>
+
+<div class="scene-overlay" id="overlay-2"><div class="scene-text">
+  <div class="countdown" id="countdownNum">3</div>
+</div></div>
+
+<div class="scene-overlay" id="overlay-3"><div class="scene-text">
+  <div class="scene-eyebrow"><span class="bar"></span><span>Scene 02 · Threshold</span></div>
+  <h1 class="scene-title">Stage right.<br><em>Eyes up.</em></h1>
+</div></div>
+
+<div class="scene-overlay" id="overlay-4"><div class="scene-text">
+  <div class="scene-eyebrow"><span class="bar"></span><span>Scene 03 · On stage</span></div>
+  <h1 class="scene-title">And we're <em>live.</em></h1>
+  <div class="scene-sub">Cameras tracking · Tally hot · Vision-mixer cut</div>
+</div></div>
+
+<div class="scene-overlay" id="overlay-5"><div class="scene-text">
+  <div class="scene-eyebrow"><span class="bar"></span><span>Scene 04 · Going out</span></div>
+  <h1 class="scene-title"><em>Worldwide.</em><br><span class="dim">In one take.</span></h1>
+</div></div>
+
+<div class="scene-overlay" id="overlay-6"><div class="scene-text">
+  <div class="scene-eyebrow"><span class="bar"></span><span>Scene 05 · Roll VT</span></div>
+  <h1 class="scene-title">Now playing<br>the <em>reel.</em></h1>
+  <div class="scene-sub">Scroll on — VT inbound ↓</div>
+</div></div>
+
+<!-- ═════════ BROADCAST UI ═════════ -->
+<div class="broadcast-ui" id="broadcastUI">
+  <div class="bc-corner-tl">
+    <span class="bc-live">Live</span>
+    <span class="bc-network">1UP NETWORK · WORLD FEED</span>
+  </div>
+  <div class="bc-corner-tr">
+    <div>FEED 01 / CAM 04</div>
+    <div class="tc" id="tc">00:00:00:00</div>
+    <div>BCN · LDN · LAX · SEL</div>
+  </div>
+  <div class="bc-chyron">
+    <span class="bc-chyron-tag">● Now broadcasting</span>
+    <div class="bc-chyron-track">
+      <div class="crawl">
+        <span>1UP Productions live from the floor</span>
+        <span>Multi-cam OB · 4K HDR · 32 cameras hot</span>
+        <span>Vision mixed in Soho · world feed at 50 fps</span>
+        <span>Welcome to the broadcast</span>
+        <span>1UP Productions live from the floor</span>
+        <span>Multi-cam OB · 4K HDR · 32 cameras hot</span>
+        <span>Vision mixed in Soho · world feed at 50 fps</span>
+        <span>Welcome to the broadcast</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═════════ IN-SCENE HOTSPOTS (positioned each frame from 3D coords) ═════════ -->
+<div class="hotspots" id="hotspots"></div>
+
+<!-- ═════════ FEED VIEWER MODAL ═════════ -->
+<div class="feed-viewer" id="feedViewer">
+  <div class="fv-bar">
+    <div class="fv-bar-left">
+      <span class="fv-pill">Live</span>
+      <span class="fv-title" id="fvTitle">CAM 04 / WORLD FEED</span>
+      <span class="fv-loc" id="fvLoc">MUNICH · DE · OB POSITION 7</span>
+    </div>
+    <div class="fv-bar-right">
+      <span>● 1UP NETWORK</span>
+      <span class="fv-tc" id="fvTc">00:00:00:00</span>
+      <button class="fv-close" id="fvClose" aria-label="Close">×</button>
+    </div>
+  </div>
+
+  <div class="fv-stage">
+    <div class="fv-frame">
+      <canvas id="fvMain" width="1920" height="1080"></canvas>
+      <div class="fv-corner tl"></div>
+      <div class="fv-corner tr"></div>
+      <div class="fv-corner bl"></div>
+      <div class="fv-corner br"></div>
+    </div>
+  </div>
+
+  <div class="fv-multicam">
+    <div class="fv-multicam-label">Multi-cam · click to switch · 5 feeds live</div>
+    <div class="fv-thumbs" id="fvThumbs"></div>
+  </div>
+</div>
+
+<!-- ═════════ SCROLL DRIVER FOR THE 3D ═════════ -->
+<div class="scroll-track"></div>
+
+<!-- ═════════ ROLL VT TRANSITION ═════════ -->
+<section class="roll-vt">
+  <div class="roll-vt-inner">
+    <div class="vt-cue">
+      <div class="label">Cue</div>
+      <div class="value">VT 01</div>
+      <div class="label" style="margin-top:24px;">Source</div>
+      <div class="value">SDI 04</div>
+    </div>
+    <div class="vt-cue center">
+      Roll VT.<span>The reel · 1UP · 2024</span>
+    </div>
+    <div class="vt-cue" style="text-align:right;">
+      <div class="label">Duration</div>
+      <div class="value" id="vtDuration">--:--</div>
+      <div class="label" style="margin-top:24px;">Status</div>
+      <div class="value">● Standby</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════ THE REEL — THIS IS WHERE YOUR SHOWREEL PLAYS ═════════ -->
+<section class="reel" id="reelSection">
+  <div class="reel-head">
+    <div class="left">01 / The Reel · 02:14</div>
+    <div class="center">Selected work, <em>cut as one.</em></div>
+    <div class="right">© 1UP Productions · 2024</div>
+  </div>
+
+  <div class="reel-frame" id="reelFrame">
+
+    <!--
+      ▼ ▼ ▼  PLACEHOLDER REEL — fully synthesized showreel  ▼ ▼ ▼
+      This <canvas> is running a simulated broadcast reel: colour bars →
+      countdown leader → six animated clip cards → 1UP end card. Loops at ~37s.
+      No external dependencies, runs offline, demonstrates the chrome with content.
+
+      WHEN YOU HAVE THE REAL 1UP SHOWREEL, swap this <canvas> for:
+
+        <video id="reelVideo" preload="metadata" muted playsinline crossorigin="anonymous">
+          <source src="https://your-cdn.com/1up-showreel-2024.mp4" type="video/mp4">
+        </video>
+
+      ...and at the bottom of this file, comment out the CANVAS REEL IIFE
+      and uncomment the VIDEO REEL IIFE (kept beneath it for easy swap).
+
+      Recommended video specs: H.264 MP4, 1920x1080, 5–8 Mbps, 60–120s,
+      muted-readable (graphics carry meaning since browsers block unmuted autoplay).
+      Hosting: Cloudflare Stream / Mux / S3+CloudFront / Vercel Blob.
+    -->
+    <canvas id="reelCanvas" width="1920" height="1080" aria-label="1UP showreel placeholder"></canvas>
+
+    <!-- cinematic frame markers -->
+    <div class="reel-corner tl"></div>
+    <div class="reel-corner tr"></div>
+    <div class="reel-corner bl"></div>
+    <div class="reel-corner br"></div>
+
+    <!-- top-left badge -->
+    <div class="reel-badge">
+      <span class="live-pill">Demo</span>
+      <span class="reel-title">1UP // The Reel // placeholder</span>
+    </div>
+    <div class="reel-tc" id="reelTc">00:00 / --:--</div>
+
+    <!-- big play button (shows until first play) -->
+    <div class="reel-play-overlay" id="reelPlayOverlay">
+      <div class="play-circle">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+      </div>
+      <div class="label">Press to roll the reel · 02:14</div>
+    </div>
+
+    <!-- custom controls -->
+    <div class="reel-controls">
+      <button class="reel-btn" id="reelPlayBtn" aria-label="Play/Pause">
+        <svg viewBox="0 0 24 24" fill="currentColor" id="reelPlayIcon">
+          <path d="M8 5v14l11-7z"/>
+        </svg>
+      </button>
+      <div class="reel-progress" id="reelProgress">
+        <div class="filled" id="reelFilled"></div>
+        <div class="scrub" id="reelScrub"></div>
+      </div>
+      <span class="reel-time" id="reelTime">00:00 / 00:00</span>
+      <button class="reel-btn" id="reelMuteBtn" aria-label="Mute">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="reelMuteIcon">
+          <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+          <line x1="23" y1="9" x2="17" y2="15"/>
+          <line x1="17" y1="9" x2="23" y2="15"/>
+        </svg>
+      </button>
+      <button class="reel-btn" id="reelFsBtn" aria-label="Fullscreen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="reel-foot">
+    <span>Edit · <strong>1UP Productions</strong></span>
+    <span>Vision mix · <strong>Soho, London</strong></span>
+    <span>Format · <strong>4K HDR · 50fps · world feed</strong></span>
+    <span>Stock · <strong>OB / Studio / Live</strong></span>
+  </div>
+</section>
+
+<!-- ═════════ PORTFOLIO ═════════ -->
+<main class="portfolio">
+  <div class="portfolio-head">
+    <div class="eyebrow">The work</div>
+    <h2><em>Selected</em><br>productions.</h2>
+  </div>
+
+  <div class="portfolio-grid">
+    <a href="#" class="pcard" data-cat="esports-1">
+      <div class="pcard-bg"></div><div class="pcard-mark">LEC<br>'24</div><div class="pcard-scrim"></div>
+      <div class="pcard-info"><div class="pcard-cat">Esports · Final</div><div class="pcard-title">LEC Finals 2024</div><div class="pcard-sub">Olympiahalle Munich · DE</div></div>
+    </a>
+    <a href="#" class="pcard" data-cat="esports-2">
+      <div class="pcard-bg"></div><div class="pcard-mark">Worlds<br>'23</div><div class="pcard-scrim"></div>
+      <div class="pcard-info"><div class="pcard-cat">Esports · Final</div><div class="pcard-title">LoL Worlds 2023</div><div class="pcard-sub">Gocheok Sky Dome · Seoul</div></div>
+    </a>
+    <a href="#" class="pcard" data-cat="esports-3">
+      <div class="pcard-bg"></div><div class="pcard-mark">VCT<br>'23</div><div class="pcard-scrim"></div>
+      <div class="pcard-info"><div class="pcard-cat">Esports · Final</div><div class="pcard-title">VCT Champions 2023</div><div class="pcard-sub">Kia Forum · Los Angeles</div></div>
+    </a>
+    <a href="#" class="pcard" data-cat="bcast-1">
+      <div class="pcard-bg"></div><div class="pcard-mark">Top<br><i>Gear</i></div><div class="pcard-scrim"></div>
+      <div class="pcard-info"><div class="pcard-cat">Broadcast · Series</div><div class="pcard-title">Top Gear</div><div class="pcard-sub">BBC One · Studio &amp; OB</div></div>
+    </a>
+    <a href="#" class="pcard" data-cat="live">
+      <div class="pcard-bg"></div><div class="pcard-mark">A$AP<br>'16</div><div class="pcard-scrim"></div>
+      <div class="pcard-info"><div class="pcard-cat">Live · Music</div><div class="pcard-title">A$AP Rocky · Coachella</div><div class="pcard-sub">Empire Polo Club · CA</div></div>
+    </a>
+    <a href="#" class="pcard" data-cat="bcast-2">
+      <div class="pcard-bg"></div><div class="pcard-mark">UFC</div><div class="pcard-scrim"></div>
+      <div class="pcard-info"><div class="pcard-cat">Broadcast · Sport</div><div class="pcard-title">UFC · Multiple Events</div><div class="pcard-sub">ESPN · Live PPV</div></div>
+    </a>
+  </div>
+
+  <div class="portfolio-cta">
+    <h3>You bring the <em>moment.</em><br>We put it on the world feed.</h3>
+    <a href="#">Brief us — let's go live →</a>
+  </div>
+
+  <footer>
+    <span>© 1Up Productions · MMXXVI</span>
+    <span>Soho, London W1</span>
+    <span>hello@1up.tv</span>
+  </footer>
+</main>
+
+<!-- ════════════════════════════════════════════════════════════════
+  THREE.JS SCENE
+════════════════════════════════════════════════════════════════ -->
+<script>
+(function() {
+  // WebGL guard
+  const testCanvas = document.createElement('canvas');
+  const gl = testCanvas.getContext('webgl') || testCanvas.getContext('experimental-webgl');
+  if (!gl || typeof THREE === 'undefined') { document.body.classList.add('no-webgl'); return; }
+
+  const stageEl = document.getElementById('canvasStage');
+
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x000000, 0.035);
+  const camera = new THREE.PerspectiveCamera(72, innerWidth/innerHeight, 0.1, 200);
+  camera.position.set(0, 1.7, -45);
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
+  stageEl.appendChild(renderer.domElement);
+
+  // lights
+  scene.add(new THREE.AmbientLight(0x14141a, 0.6));
+  const keyLight = new THREE.SpotLight(0xff2d20, 0, 60, Math.PI/5, 0.4, 1);
+  keyLight.position.set(-8, 14, 8); keyLight.target.position.set(0, 1, 8);
+  scene.add(keyLight); scene.add(keyLight.target);
+  const fillLight = new THREE.SpotLight(0x6affae, 0, 60, Math.PI/5, 0.4, 1);
+  fillLight.position.set(8, 14, 8); fillLight.target.position.set(0, 1, 8);
+  scene.add(fillLight); scene.add(fillLight.target);
+  const arenaLight = new THREE.PointLight(0xffffff, 0.4, 60);
+  arenaLight.position.set(0, 10, 12); scene.add(arenaLight);
+
+  // tunnel
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0x141418, roughness: 0.95, side: THREE.BackSide });
+  const tunnelBox = new THREE.Mesh(new THREE.BoxGeometry(7, 4.5, 56), wallMat);
+  tunnelBox.position.set(0, 2.25, -28); scene.add(tunnelBox);
+  const tunnelFloor = new THREE.Mesh(
+    new THREE.PlaneGeometry(7, 56),
+    new THREE.MeshStandardMaterial({ color: 0x0c0c10, roughness: 0.6, metalness: 0.3 })
+  );
+  tunnelFloor.rotation.x = -Math.PI/2; tunnelFloor.position.set(0, 0.001, -28); scene.add(tunnelFloor);
+  for (let z = -52; z <= -4; z += 3) {
+    const strip = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.05, 0.25), new THREE.MeshBasicMaterial({ color: 0xfffaf0 }));
+    strip.position.set(0, 4.45, z); scene.add(strip);
+    const glow = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.6, 0.4),
+      new THREE.MeshBasicMaterial({ color: 0xfff0e0, transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending })
+    );
+    glow.rotation.x = Math.PI/2; glow.position.set(0, 4.25, z); scene.add(glow);
+  }
+  for (let z = -52; z <= -4; z += 1.5) {
+    const ac = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.8), new THREE.MeshBasicMaterial({ color: 0xff2d20 }));
+    ac.position.set(-3.49, 1.2, z); scene.add(ac);
+    const ar = ac.clone(); ar.position.x = 3.49; scene.add(ar);
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  //  FEED SYSTEM — clickable broadcast feeds
+  //
+  //  Each feed has its own canvas drawing animation. The same canvas
+  //  is used three ways: as a Three.js texture on in-scene surfaces,
+  //  as a thumbnail in the modal cam selector, and copied to the
+  //  modal main canvas when active.
+  //
+  //  WHEN YOU GET REAL FOOTAGE: each `draw*` function below maps to a
+  //  short looped MP4. Replace the canvas with a hidden <video> element
+  //  + THREE.VideoTexture and you're done. See comment at the bottom.
+  // ════════════════════════════════════════════════════════════════
+
+  function makeFeedCanvas(w, h) {
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    return c;
+  }
+  function fmtTC(s) {
+    const total = Math.floor(s * 25);
+    const f = total % 25;
+    const sec = Math.floor(total / 25) % 60;
+    const min = Math.floor(total / 1500) % 60;
+    return `${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')}:${String(f).padStart(2,'0')}`;
+  }
+  function drawViewfinderCorners(ctx, w, h, color = '#fff') {
+    const m = w * 0.025, sz = w * 0.04;
+    ctx.strokeStyle = color; ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(m, m+sz); ctx.lineTo(m, m); ctx.lineTo(m+sz, m);
+    ctx.moveTo(w-m-sz, m); ctx.lineTo(w-m, m); ctx.lineTo(w-m, m+sz);
+    ctx.moveTo(m, h-m-sz); ctx.lineTo(m, h-m); ctx.lineTo(m+sz, h-m);
+    ctx.moveTo(w-m-sz, h-m); ctx.lineTo(w-m, h-m); ctx.lineTo(w-m, h-m-sz);
+    ctx.stroke();
+  }
+  function drawBroadcastChrome(ctx, t, w, h, camLabel, locLabel, accent='#ff2d20') {
+    const fs = w * 0.022;
+    ctx.fillStyle = accent;
+    ctx.globalAlpha = 0.6 + Math.sin(t*4)*0.4;
+    ctx.beginPath(); ctx.arc(w*0.07, h*0.13, fs*0.5, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#fff'; ctx.font = `bold ${fs}px monospace`; ctx.textAlign = 'left';
+    ctx.fillText('REC', w*0.09, h*0.14);
+    ctx.font = `bold ${fs}px monospace`; ctx.textAlign = 'right'; ctx.fillStyle = accent;
+    ctx.fillText(fmtTC(t), w*0.95, h*0.14);
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(0, h - h*0.09, w, h*0.09);
+    ctx.fillStyle = accent;
+    ctx.fillRect(0, h - h*0.09, w*0.005, h*0.09);
+    ctx.fillStyle = '#fff'; ctx.font = `bold ${fs*1.1}px monospace`; ctx.textAlign = 'left';
+    ctx.fillText(camLabel, w*0.025, h - h*0.03);
+    ctx.font = `${fs*0.9}px monospace`; ctx.textAlign = 'right'; ctx.fillStyle = '#aaa';
+    ctx.fillText(locLabel + '  ·  1UP NETWORK', w*0.975, h - h*0.03);
+  }
+
+  // ── Feed: WORLD (viewfinder framing the talent) ──
+  function drawWorldFeed(ctx, t, w, h) {
+    ctx.fillStyle = '#070710'; ctx.fillRect(0, 0, w, h);
+    const grad = ctx.createRadialGradient(w*0.5, h*0.55, 50, w*0.5, h*0.55, w*0.6);
+    grad.addColorStop(0, 'rgba(255, 45, 32, 0.25)');
+    grad.addColorStop(0.5, 'rgba(255, 45, 32, 0.05)');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grad; ctx.fillRect(0, 0, w, h);
+    const cx = w/2, cy = h*0.65;
+    const breathe = 1 + Math.sin(t*1.5)*0.01;
+    ctx.fillStyle = '#0e0e14';
+    ctx.beginPath(); ctx.ellipse(cx, cy - h*0.18, h*0.06*breathe, h*0.07*breathe, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillRect(cx - h*0.09*breathe, cy - h*0.08, h*0.18*breathe, h*0.22);
+    // crosshair
+    ctx.strokeStyle = 'rgba(255, 45, 32, 0.7)'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx-60, cy - h*0.18); ctx.lineTo(cx-24, cy - h*0.18);
+    ctx.moveTo(cx+24, cy - h*0.18); ctx.lineTo(cx+60, cy - h*0.18);
+    ctx.moveTo(cx, cy - h*0.18 - 36); ctx.lineTo(cx, cy - h*0.18 - 12);
+    ctx.moveTo(cx, cy - h*0.18 + 12); ctx.lineTo(cx, cy - h*0.18 + 36);
+    ctx.stroke();
+    drawViewfinderCorners(ctx, w, h);
+    drawBroadcastChrome(ctx, t, w, h, 'WORLD FEED', 'CAM 04 · OB 7');
+  }
+
+  // ── Feed: BACKSTAGE (real video + CCTV overlay + broadcast chrome) ──
+  function drawBackstageFeed(ctx, t, w, h) {
+    // 1. Draw the real video frame as the base layer (if loaded)
+    const v = window._backstageVideo;
+    if (v && v.readyState >= 2 && v.videoWidth > 0) {
+      // cover-fit the video into the canvas
+      const vAspect = v.videoWidth / v.videoHeight;
+      const cAspect = w / h;
+      let sx, sy, sw, sh;
+      if (vAspect > cAspect) {
+        // video wider than canvas — crop sides
+        sh = v.videoHeight;
+        sw = sh * cAspect;
+        sx = (v.videoWidth - sw) / 2;
+        sy = 0;
+      } else {
+        sw = v.videoWidth;
+        sh = sw / cAspect;
+        sx = 0;
+        sy = (v.videoHeight - sh) / 2;
+      }
+      try {
+        ctx.drawImage(v, sx, sy, sw, sh, 0, 0, w, h);
+      } catch (e) {
+        // CORS taint fallback
+        ctx.fillStyle = '#08080a'; ctx.fillRect(0, 0, w, h);
+      }
+    } else {
+      // video not yet ready — dark fallback while it buffers
+      ctx.fillStyle = '#08080a'; ctx.fillRect(0, 0, w, h);
+      // faint loading indicator
+      ctx.fillStyle = 'rgba(136, 200, 168, 0.5)';
+      ctx.font = '20px monospace'; ctx.textAlign = 'center';
+      ctx.fillText('● BUFFERING FEED…', w/2, h/2);
+    }
+
+    // 2. Desaturate + green CCTV tint
+    ctx.fillStyle = 'rgba(20, 60, 50, 0.3)';
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+    ctx.fillRect(0, 0, w, h);
+
+    // 3. Horizontal scanlines (heavy)
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+    for (let y = 0; y < h; y += 3) ctx.fillRect(0, y, w, 1);
+
+    // 4. Rolling interference bar
+    const intY = (t * 120) % h;
+    ctx.fillStyle = 'rgba(160, 220, 200, 0.14)';
+    ctx.fillRect(0, intY, w, 3);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.fillRect(0, intY - 1, w, 1);
+
+    // 5. Broadcast chrome (REC / TC / corners / bottom bar)
+    drawViewfinderCorners(ctx, w, h, '#88c8a8');
+    drawBroadcastChrome(ctx, t, w, h, 'BACKSTAGE', 'CAM 12 · LIVE · GREEN ROOM', '#88c8a8');
+  }
+
+  // ── Feed: CAM 01 WIDE (animated stage with lighting) ──
+  function drawCam01Wide(ctx, t, w, h) {
+    ctx.fillStyle = '#06060a'; ctx.fillRect(0, 0, w, h);
+    const fg = ctx.createLinearGradient(0, h*0.6, 0, h);
+    fg.addColorStop(0, '#0a0a14'); fg.addColorStop(1, '#04040a');
+    ctx.fillStyle = fg; ctx.fillRect(0, h*0.6, w, h*0.4);
+
+    // moving stage lights
+    const lx1 = w*0.3 + Math.sin(t*0.8) * w*0.15;
+    const g1 = ctx.createRadialGradient(lx1, h*0.55, 0, lx1, h*0.55, w*0.4);
+    g1.addColorStop(0, 'rgba(255, 45, 32, 0.55)');
+    g1.addColorStop(0.5, 'rgba(255, 45, 32, 0.10)');
+    g1.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g1; ctx.fillRect(0, 0, w, h);
+    const lx2 = w*0.7 + Math.cos(t*0.6) * w*0.15;
+    const g2 = ctx.createRadialGradient(lx2, h*0.55, 0, lx2, h*0.55, w*0.4);
+    g2.addColorStop(0, 'rgba(106, 255, 174, 0.45)');
+    g2.addColorStop(0.5, 'rgba(106, 255, 174, 0.08)');
+    g2.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g2; ctx.fillRect(0, 0, w, h);
+
+    // stage LED ring
+    ctx.strokeStyle = 'rgba(255, 45, 32, 0.8)'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.ellipse(w/2, h*0.7, w*0.32, h*0.06, 0, 0, Math.PI*2); ctx.stroke();
+
+    // talent on stage
+    const cx = w/2, cy = h*0.58;
+    ctx.fillStyle = '#08080a';
+    ctx.beginPath(); ctx.ellipse(cx, cy - h*0.04, h*0.025, h*0.03, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillRect(cx - h*0.04, cy - h*0.005, h*0.08, h*0.14);
+
+    // crowd silhouettes at bottom
+    ctx.fillStyle = '#06060a';
+    for (let i = 0; i < 32; i++) {
+      const cxi = (i / 32) * w + (i*7919 % 4);
+      const sz = 12 + (i % 3) * 4;
+      ctx.fillRect(cxi - sz/2, h - sz - 8, sz, sz);
+      ctx.beginPath(); ctx.arc(cxi, h - sz - 8, sz/2, 0, Math.PI*2); ctx.fill();
+    }
+
+    // truss lights
+    for (let i = 0; i < 8; i++) {
+      const tx = (i+0.5)/8 * w;
+      const f = 0.6 + Math.sin(t*4 + i)*0.4;
+      ctx.fillStyle = `rgba(255, 200, 150, ${f * 0.5})`;
+      ctx.fillRect(tx - 4, 28, 8, 18);
+    }
+    drawViewfinderCorners(ctx, w, h);
+    drawBroadcastChrome(ctx, t, w, h, 'CAM 01 / WIDE', 'OB POSITION 7 · JIB');
+  }
+
+  // ── Feed: CAM 02 TIGHT (close-up with bokeh) ──
+  function drawCam02Tight(ctx, t, w, h) {
+    ctx.fillStyle = '#0a0a0e'; ctx.fillRect(0, 0, w, h);
+    // bokeh out-of-focus background
+    for (let i = 0; i < 18; i++) {
+      const bx = ((i*73 + t*15) % (w + 80)) - 40;
+      const by = h*0.2 + (i % 5) * h*0.18;
+      const r = 30 + (i % 3) * 20;
+      const og = ctx.createRadialGradient(bx, by, 0, bx, by, r);
+      const col = i % 3 === 0 ? 'rgba(255, 45, 32, 0.4)'
+                : i % 3 === 1 ? 'rgba(255, 200, 150, 0.3)'
+                : 'rgba(106, 255, 174, 0.25)';
+      og.addColorStop(0, col);
+      og.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = og;
+      ctx.fillRect(bx - r, by - r, r*2, r*2);
+    }
+    // rim light
+    const rim = ctx.createLinearGradient(0, 0, w, 0);
+    rim.addColorStop(0, 'rgba(255, 45, 32, 0.18)');
+    rim.addColorStop(0.5, 'rgba(0,0,0,0)');
+    rim.addColorStop(1, 'rgba(106, 255, 174, 0.12)');
+    ctx.fillStyle = rim; ctx.fillRect(0, 0, w, h);
+
+    // big talent close-up silhouette
+    const cx = w*0.5, cy = h*0.55;
+    const breathe = 1 + Math.sin(t*1.4)*0.008;
+    ctx.fillStyle = '#06060a';
+    ctx.beginPath(); ctx.ellipse(cx, cy - h*0.05, h*0.22*breathe, h*0.26*breathe, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillRect(cx - h*0.32*breathe, cy + h*0.18, h*0.64*breathe, h*0.5);
+    ctx.fillStyle = 'rgba(255, 200, 150, 0.15)';
+    ctx.beginPath(); ctx.ellipse(cx + h*0.12, cy - h*0.18, h*0.1, h*0.12, 0, 0, Math.PI*2); ctx.fill();
+
+    drawViewfinderCorners(ctx, w, h);
+    drawBroadcastChrome(ctx, t, w, h, 'CAM 02 / TIGHT', 'HANDHELD · STEDICAM');
+  }
+
+  // ── Feed: CROWD (sea of phone lights) ──
+  function drawCrowdCam(ctx, t, w, h) {
+    ctx.fillStyle = '#04040a'; ctx.fillRect(0, 0, w, h);
+    // distant stage glow
+    const sg = ctx.createRadialGradient(w/2, 0, 0, w/2, 0, w*0.45);
+    sg.addColorStop(0, 'rgba(255, 45, 32, 0.45)');
+    sg.addColorStop(0.5, 'rgba(255, 45, 32, 0.08)');
+    sg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = sg; ctx.fillRect(0, 0, w, h*0.6);
+    // phone lights
+    for (let i = 0; i < 240; i++) {
+      const seed = i * 7919;
+      const lx = seed % w;
+      const ly = h*0.25 + ((seed * 13) % (h*0.65 | 0));
+      const sp = 0.5 + (seed % 100) / 100;
+      const f = 0.4 + Math.sin(t * sp + i) * 0.45;
+      if (f > 0.3) {
+        const r = 2 + (i % 4);
+        ctx.fillStyle = `rgba(255, 250, 220, ${f * 0.9})`;
+        ctx.beginPath(); ctx.arc(lx, ly, r, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = `rgba(255, 250, 220, ${f * 0.18})`;
+        ctx.beginPath(); ctx.arc(lx, ly, r*3, 0, Math.PI*2); ctx.fill();
+      }
+    }
+    // crowd horizon
+    ctx.fillStyle = '#020204';
+    for (let x = 0; x < w; x += 8) {
+      const headH = h*0.8 + ((x * 13) % 6);
+      ctx.beginPath(); ctx.arc(x + 4, headH, 6, 0, Math.PI*2); ctx.fill();
+      ctx.fillRect(x, headH, 8, h - headH);
+    }
+    drawViewfinderCorners(ctx, w, h);
+    drawBroadcastChrome(ctx, t, w, h, 'CAM 03 / CROWD', 'FOH · FRONT-OF-HOUSE');
+  }
+
+  // ── Feed registry ──
+  const FEED_W = 768, FEED_H = 432;
+  const feeds = {
+    world:     { id: 'world',     label: 'WORLD FEED',     loc: 'MUNICH · DE · OB POS 7',  draw: drawWorldFeed,    canvas: makeFeedCanvas(FEED_W, FEED_H) },
+    backstage: { id: 'backstage', label: 'BACKSTAGE',      loc: 'CAM 12 · GREEN ROOM',     draw: drawBackstageFeed,canvas: makeFeedCanvas(FEED_W, FEED_H) },
+    cam01:     { id: 'cam01',     label: 'CAM 01 / WIDE',  loc: 'OB POSITION 7 · JIB',     draw: drawCam01Wide,    canvas: makeFeedCanvas(FEED_W, FEED_H) },
+    cam02:     { id: 'cam02',     label: 'CAM 02 / TIGHT', loc: 'HANDHELD · STEDICAM',     draw: drawCam02Tight,   canvas: makeFeedCanvas(FEED_W, FEED_H) },
+    crowd:     { id: 'crowd',     label: 'CAM 03 / CROWD', loc: 'FOH · FRONT-OF-HOUSE',    draw: drawCrowdCam,     canvas: makeFeedCanvas(FEED_W, FEED_H) },
+  };
+  Object.values(feeds).forEach(f => {
+    f.ctx = f.canvas.getContext('2d');
+    f.texture = new THREE.CanvasTexture(f.canvas);
+    f.texture.minFilter = THREE.LinearFilter;
+    f.texture.encoding = THREE.sRGBEncoding;
+  });
+  window._feeds = feeds;
+
+  // ════════════════════════════════════════════════════════════════
+  //  VIDEO TEXTURES — real video playing on in-scene surfaces
+  //
+  //  Placeholders use Google's CORS-enabled gtv-videos-bucket.
+  //  When you get real 1UP footage, just replace these URLs.
+  //
+  //  Requirements for any replacement video:
+  //   • MP4 (H.264 + AAC) or WebM (VP8/VP9 + Opus)
+  //   • Served with `Access-Control-Allow-Origin: *` header
+  //   • Short loops work best (10–30s, muted, playsinline-safe)
+  //   • Cloudflare Stream / Mux / S3 + CloudFront / Vercel Blob all work
+  // ════════════════════════════════════════════════════════════════
+
+  const VIDEO_SOURCES = {
+    //  ▼ ▼ ▼  SWAP THESE FOR YOUR REAL FOOTAGE  ▼ ▼ ▼
+    //  Each entry is an ORDERED FALLBACK LIST — the video element tries
+    //  them in turn until one plays successfully.
+    //  The defaults below are two known-stable CORS-enabled test videos:
+    //   1. Three.js's own sintel.mp4 (from their webgl_materials_video example)
+    //   2. MDN's CC0 flower.mp4 (from their interactive HTML docs)
+    backstage: [
+      'https://threejs.org/examples/textures/sintel.mp4',
+      'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
+    ],
+    floor: [
+      'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
+      'https://threejs.org/examples/textures/sintel.mp4',
+    ],
+  };
+
+  function makeVideoEl(urlList) {
+    const v = document.createElement('video');
+    v.crossOrigin = 'anonymous';
+    v.loop = true;
+    v.muted = true;
+    v.playsInline = true;
+    v.setAttribute('playsinline', '');
+    v.setAttribute('webkit-playsinline', '');
+    v.autoplay = true;
+    v.preload = 'auto';
+    // Offscreen, but NOT display:none (Safari refuses to play undisplayed videos)
+    v.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:4px;height:4px;opacity:0;pointer-events:none;z-index:-1;';
+    document.body.appendChild(v);
+
+    const urls = Array.isArray(urlList) ? urlList.slice() : [urlList];
+    let tried = 0;
+    const tryNext = () => {
+      if (tried >= urls.length) {
+        console.warn('[1UP] all video sources failed — monitors will show canvas fallback');
+        return;
+      }
+      const url = urls[tried++];
+      console.log('[1UP] loading video (attempt ' + tried + '):', url.split('/').pop());
+      v.src = url;
+      v.load();
+      const p = v.play();
+      if (p && p.catch) p.catch(() => {}); // user-gesture fallback kicks in below
+    };
+
+    v.addEventListener('error', () => {
+      console.warn('[1UP] video failed, trying fallback:', v.currentSrc || v.src);
+      tryNext();
+    });
+    v.addEventListener('playing', () => {
+      console.log('[1UP] ✓ video playing:', (v.currentSrc || v.src).split('/').pop());
+    });
+
+    tryNext();
+
+    // Gesture fallback for autoplay blocks (Safari, mobile)
+    const onGesture = () => {
+      v.play().catch(() => {});
+      document.removeEventListener('click', onGesture);
+      document.removeEventListener('scroll', onGesture);
+      document.removeEventListener('touchstart', onGesture);
+    };
+    document.addEventListener('click', onGesture, { passive: true });
+    document.addEventListener('scroll', onGesture, { passive: true });
+    document.addEventListener('touchstart', onGesture, { passive: true });
+
+    return v;
+  }
+
+  const backstageVideo = makeVideoEl(VIDEO_SOURCES.backstage);
+  const floorVideo = makeVideoEl(VIDEO_SOURCES.floor);
+
+  // Direct VideoTexture for the floor panels (no canvas intermediate)
+  const floorVideoTex = new THREE.VideoTexture(floorVideo);
+  floorVideoTex.minFilter = THREE.LinearFilter;
+  floorVideoTex.magFilter = THREE.LinearFilter;
+  floorVideoTex.format = THREE.RGBAFormat;
+
+  // The backstage video is drawn onto the feeds.backstage canvas each frame,
+  // layered with CCTV tint + broadcast chrome. See drawBackstageFeed below.
+  window._backstageVideo = backstageVideo;
+
+  // ── Tunnel monitors (using BACKSTAGE feed texture) ──
+  const monitorPositions = [
+    [-3.45, 2.0, -42, 'right'], [3.45, 2.0, -42, 'left'],
+    [-3.45, 2.0, -28, 'right'], [3.45, 2.0, -28, 'left'],
+    [-3.45, 2.0, -14, 'right'], [3.45, 2.0, -14, 'left'],
+  ];
+  monitorPositions.forEach(([x, y, z, dir]) => {
+    const frame = new THREE.Mesh(
+      new THREE.BoxGeometry(2.4, 1.4, 0.12),
+      new THREE.MeshStandardMaterial({ color: 0x05050a, metalness: 0.7, roughness: 0.4 })
+    );
+    frame.position.set(x, y, z);
+    frame.rotation.y = dir === 'right' ? Math.PI/2 : -Math.PI/2;
+    scene.add(frame);
+    const screen = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.2, 1.2),
+      new THREE.MeshBasicMaterial({ map: feeds.backstage.texture })
+    );
+    screen.position.set(x + (dir === 'right' ? 0.07 : -0.07), y, z);
+    screen.rotation.y = dir === 'right' ? Math.PI/2 : -Math.PI/2;
+    scene.add(screen);
+  });
+
+  // ── Stage floor LED brand graphic ──
+  const stageFloorCanvas = makeFeedCanvas(512, 512);
+  const stageFloorCtx = stageFloorCanvas.getContext('2d');
+  const stageFloorTexture = new THREE.CanvasTexture(stageFloorCanvas);
+  function drawStageFloor(t) {
+    const x = stageFloorCtx, w = stageFloorCanvas.width, h = stageFloorCanvas.height;
+    x.fillStyle = '#06060a'; x.fillRect(0, 0, w, h);
+    const pulse = 0.5 + Math.sin(t*2)*0.2;
+    const grad = x.createRadialGradient(w/2, h/2, 0, w/2, h/2, w*0.5);
+    grad.addColorStop(0, `rgba(255, 45, 32, ${pulse * 0.55})`);
+    grad.addColorStop(0.5, `rgba(255, 45, 32, ${pulse * 0.15})`);
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    x.fillStyle = grad; x.fillRect(0, 0, w, h);
+    x.fillStyle = '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.font = 'bold 200px sans-serif'; x.fillText('1', w/2 - 50, h/2 + 10);
+    x.font = 'italic 200px serif'; x.fillText('UP', w/2 + 60, h/2 + 10);
+    x.textBaseline = 'alphabetic';
+    stageFloorTexture.needsUpdate = true;
+  }
+  const stageFloorLed = new THREE.Mesh(
+    new THREE.CircleGeometry(4.3, 48),
+    new THREE.MeshBasicMaterial({ map: stageFloorTexture, transparent: true, opacity: 0.85 })
+  );
+  stageFloorLed.rotation.x = -Math.PI/2;
+  stageFloorLed.position.set(0, 0.61, 8);
+  scene.add(stageFloorLed);
+
+  // ── LED FLOOR PANELS (real video) — flanking the walk to stage ──
+  // These are laid flat on the arena floor between the tunnel exit and the stage,
+  // each showing real video footage via THREE.VideoTexture.
+  const floorPanelGeo = new THREE.PlaneGeometry(2.8, 6.5);
+  const floorPanelMat = new THREE.MeshBasicMaterial({ map: floorVideoTex });
+  const floorPanelL = new THREE.Mesh(floorPanelGeo, floorPanelMat);
+  floorPanelL.rotation.x = -Math.PI/2;
+  floorPanelL.position.set(-4.2, 0.015, 3);
+  scene.add(floorPanelL);
+  const floorPanelR = new THREE.Mesh(floorPanelGeo, floorPanelMat);
+  floorPanelR.rotation.x = -Math.PI/2;
+  floorPanelR.position.set(4.2, 0.015, 3);
+  scene.add(floorPanelR);
+
+  // Subtle LED edge glow around each panel (additive, so it looks "lit from within")
+  [floorPanelL, floorPanelR].forEach(p => {
+    const edgeGeo = new THREE.PlaneGeometry(3.0, 6.7);
+    const edgeMat = new THREE.MeshBasicMaterial({
+      color: 0xff2d20, transparent: true, opacity: 0.12,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    });
+    const edge = new THREE.Mesh(edgeGeo, edgeMat);
+    edge.rotation.x = -Math.PI/2;
+    edge.position.set(p.position.x, 0.01, p.position.z);
+    scene.add(edge);
+  });
+
+  // ── Hotspots — 3D positions that project to clickable HTML labels ──
+  const hotspotDefs = [
+    { feedId: 'backstage', pos: new THREE.Vector3(0, 2.6, -10),    label: 'Backstage feed' },
+    { feedId: 'world',     pos: new THREE.Vector3(0, 5.5, 15.7),   label: 'World feed · LED' },
+    { feedId: 'cam01',     pos: new THREE.Vector3(-7.5, 2.4, 4.2), label: 'Cam 01 · Wide' },
+    { feedId: 'cam02',     pos: new THREE.Vector3(7.5, 2.4, 4.2),  label: 'Cam 02 · Tight' },
+    { feedId: 'crowd',     pos: new THREE.Vector3(0, 4.5, -1),     label: 'Crowd cam' },
+  ];
+  const hotspotsEl = document.getElementById('hotspots');
+  hotspotDefs.forEach(h => {
+    const el = document.createElement('div');
+    el.className = 'hotspot';
+    el.innerHTML = `<div class="hotspot-dot"></div><div class="hotspot-label"><span class="pre">◉ Live</span>${h.label}</div>`;
+    el.addEventListener('click', () => window._launchFeed(h.feedId));
+    hotspotsEl.appendChild(el);
+    h.el = el;
+  });
+  window._hotspotDefs = hotspotDefs;
+  window._sceneCamera = camera;
+  window._stageFloor = drawStageFloor;
+
+  // arena floor
+  const arenaFloor = new THREE.Mesh(
+    new THREE.PlaneGeometry(80, 80),
+    new THREE.MeshStandardMaterial({ color: 0x07070a, roughness: 0.4, metalness: 0.6 })
+  );
+  arenaFloor.rotation.x = -Math.PI/2; arenaFloor.position.set(0, 0, 10); scene.add(arenaFloor);
+
+  // stage
+  const stagePlatform = new THREE.Mesh(
+    new THREE.CylinderGeometry(4.5, 4.8, 0.6, 48),
+    new THREE.MeshStandardMaterial({ color: 0x18181c, roughness: 0.4, metalness: 0.4 })
+  );
+  stagePlatform.position.set(0, 0.3, 8); scene.add(stagePlatform);
+  const stageEdge = new THREE.Mesh(
+    new THREE.TorusGeometry(4.5, 0.05, 6, 64),
+    new THREE.MeshBasicMaterial({ color: 0xff2d20 })
+  );
+  stageEdge.rotation.x = Math.PI/2; stageEdge.position.set(0, 0.6, 8); scene.add(stageEdge);
+
+  // LED wall + canvas texture
+  const ledCanvas = document.createElement('canvas');
+  ledCanvas.width = 1024; ledCanvas.height = 384;
+  const ledCtx = ledCanvas.getContext('2d');
+  const ledTexture = new THREE.CanvasTexture(ledCanvas);
+  ledTexture.minFilter = THREE.LinearFilter;
+
+  const ledGeo = new THREE.PlaneGeometry(22, 8, 48, 8);
+  const pos = ledGeo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    pos.setZ(i, -Math.pow(x/11, 2) * 1.8);
+  }
+  ledGeo.computeVertexNormals();
+  const ledWall = new THREE.Mesh(ledGeo, new THREE.MeshBasicMaterial({ map: ledTexture }));
+  ledWall.position.set(0, 5.5, 16); scene.add(ledWall);
+  const ledFrame = new THREE.Mesh(
+    new THREE.BoxGeometry(23, 9, 0.3),
+    new THREE.MeshStandardMaterial({ color: 0x06060a, metalness: 0.9, roughness: 0.4 })
+  );
+  ledFrame.position.set(0, 5.5, 16.4); scene.add(ledFrame);
+
+  // truss + lamps
+  const truss = new THREE.Mesh(
+    new THREE.BoxGeometry(20, 0.4, 0.4),
+    new THREE.MeshStandardMaterial({ color: 0x141418, metalness: 0.8, roughness: 0.5 })
+  );
+  truss.position.set(0, 12, 10); scene.add(truss);
+  for (let x = -8; x <= 8; x += 4) {
+    const housing = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.3, 0.4, 0.6, 12),
+      new THREE.MeshStandardMaterial({ color: 0x06060a, metalness: 0.7 })
+    );
+    housing.position.set(x, 11.5, 10); scene.add(housing);
+    const bulb = new THREE.Mesh(
+      new THREE.SphereGeometry(0.25, 16, 16),
+      new THREE.MeshBasicMaterial({ color: x < 0 ? 0xff2d20 : 0x6affae })
+    );
+    bulb.position.set(x, 11.2, 10); scene.add(bulb);
+  }
+
+  function lightCone(color, fx, fy, fz, tx, ty, tz, opacity = 0.07) {
+    const dir = new THREE.Vector3(tx-fx, ty-fy, tz-fz);
+    const len = dir.length();
+    const geo = new THREE.ConeGeometry(2.2, len, 28, 1, true);
+    const mat = new THREE.MeshBasicMaterial({
+      color, transparent: true, opacity,
+      blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false
+    });
+    const cone = new THREE.Mesh(geo, mat);
+    cone.position.set(fx, fy, fz);
+    cone.lookAt(tx, ty, tz);
+    cone.rotateX(Math.PI/2);
+    cone.translateY(-len/2);
+    return cone;
+  }
+  const cone1 = lightCone(0xff2d20, -8, 11.5, 8, 0, 0.5, 8);
+  const cone2 = lightCone(0x6affae, 8, 11.5, 8, 0, 0.5, 8);
+  const cone3 = lightCone(0xffeecc, 0, 11.5, 14, 0, 0.5, 8, 0.04);
+  scene.add(cone1, cone2, cone3);
+
+  // crowd (instanced)
+  const CROWD_COUNT = 480;
+  const crowdGeo = new THREE.BoxGeometry(0.28, 1.1, 0.28);
+  const crowdMat = new THREE.MeshStandardMaterial({ color: 0x1a1a20, roughness: 0.95 });
+  const crowd = new THREE.InstancedMesh(crowdGeo, crowdMat, CROWD_COUNT);
+  const dummy = new THREE.Object3D();
+  const crowdData = [];
+  for (let i = 0; i < CROWD_COUNT; i++) {
+    const tier = Math.floor(Math.random() * 6);
+    const angle = (Math.random() - 0.5) * Math.PI * 1.2;
+    const radius = 9 + tier * 2.4 + Math.random() * 0.6;
+    const x = Math.sin(angle) * radius;
+    const z = 8 + Math.cos(angle) * radius;
+    const y = 0.55 + tier * 0.55 + Math.random() * 0.2;
+    dummy.position.set(x, y, z);
+    dummy.scale.set(1 + Math.random()*0.2, 0.85 + Math.random()*0.4, 1);
+    dummy.rotation.y = -angle;
+    dummy.updateMatrix();
+    crowd.setMatrixAt(i, dummy.matrix);
+    crowdData.push({ x, baseY: y, z, phase: Math.random()*Math.PI*2, sx: dummy.scale.x, sy: dummy.scale.y, sz: dummy.scale.z, ry: -angle });
+  }
+  crowd.instanceMatrix.needsUpdate = true; scene.add(crowd);
+
+  // glow sticks
+  for (let i = 0; i < 60; i++) {
+    const tier = Math.floor(Math.random()*6);
+    const angle = (Math.random()-0.5) * Math.PI * 1.2;
+    const radius = 9 + tier * 2.4;
+    const x = Math.sin(angle) * radius;
+    const z = 8 + Math.cos(angle) * radius;
+    const y = 0.55 + tier * 0.55 + 0.8;
+    const stick = new THREE.Mesh(
+      new THREE.SphereGeometry(0.08, 6, 6),
+      new THREE.MeshBasicMaterial({
+        color: Math.random()>0.5 ? 0xff2d20 : 0x6affae,
+        transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending
+      })
+    );
+    stick.position.set(x, y, z); scene.add(stick);
+  }
+
+  // broadcast cameras
+  const broadcastCams = [];
+  function makeBroadcastCam(x, y, z) {
+    const g = new THREE.Group();
+    const tripod = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.05, 0.08, y, 8),
+      new THREE.MeshStandardMaterial({ color: 0x202024, metalness: 0.7 })
+    );
+    tripod.position.y = -y/2; g.add(tripod);
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(0.65, 0.42, 0.85),
+      new THREE.MeshStandardMaterial({ color: 0x07070a, metalness: 0.55, roughness: 0.4 })
+    );
+    g.add(body);
+    const handle = new THREE.Mesh(
+      new THREE.BoxGeometry(0.15, 0.08, 0.5),
+      new THREE.MeshStandardMaterial({ color: 0x0a0a0c, metalness: 0.7 })
+    );
+    handle.position.y = 0.25; g.add(handle);
+    const lens = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.2, 0.24, 0.55, 20),
+      new THREE.MeshStandardMaterial({ color: 0x0a0a0c, metalness: 0.85, roughness: 0.3 })
+    );
+    lens.rotation.x = Math.PI/2; lens.position.set(0, 0, 0.65); g.add(lens);
+    const glass = new THREE.Mesh(
+      new THREE.CircleGeometry(0.18, 20),
+      new THREE.MeshBasicMaterial({ color: 0x152025 })
+    );
+    glass.position.set(0, 0, 0.93); g.add(glass);
+    const tally = new THREE.Mesh(
+      new THREE.SphereGeometry(0.06, 10, 10),
+      new THREE.MeshBasicMaterial({ color: 0xff2d20 })
+    );
+    tally.position.set(0, 0.28, 0.4); g.add(tally);
+    g.userData.tally = tally;
+    g.position.set(x, y, z);
+    return g;
+  }
+  [[-7.5,1.7,4],[7.5,1.7,4],[-9,3.2,12],[9,3.2,12]].forEach(p => {
+    const c = makeBroadcastCam(p[0], p[1], p[2]); scene.add(c); broadcastCams.push(c);
+  });
+
+  // LED canvas drawing
+  function drawLED(p, t) {
+    const w = ledCanvas.width, h = ledCanvas.height;
+    ledCtx.fillStyle = '#050507'; ledCtx.fillRect(0, 0, w, h);
+
+    if (p < 0.55) {
+      const bars = ['#c8c800','#00c8c8','#00c800','#c800c8','#c80000','#0000c8','#080808'];
+      const bw = w / bars.length;
+      bars.forEach((c, i) => {
+        ledCtx.fillStyle = c;
+        ledCtx.globalAlpha = 0.35 + Math.sin(t*1.5 + i)*0.05;
+        ledCtx.fillRect(i*bw, 0, bw, h);
+      });
+      ledCtx.globalAlpha = 1;
+      ledCtx.fillStyle = '#fff';
+      ledCtx.font = 'bold 56px monospace'; ledCtx.textAlign = 'center';
+      ledCtx.fillText('STANDBY', w/2, h/2 - 10);
+      ledCtx.font = '24px monospace'; ledCtx.fillStyle = '#ff2d20';
+      ledCtx.fillText('● COMMS HOT — ROLL VT', w/2, h/2 + 30);
+    } else {
+      ledCtx.fillStyle = '#070710'; ledCtx.fillRect(0, 0, w, h);
+      const cx = w/2, cy = h/2 + 30;
+      ledCtx.fillStyle = '#1a1a22';
+      ledCtx.beginPath(); ledCtx.arc(cx, cy-70, 38, 0, Math.PI*2); ledCtx.fill();
+      ledCtx.fillRect(cx-50, cy-30, 100, 120);
+      ledCtx.fillRect(cx-80, cy+10, 30, 90);
+      ledCtx.fillRect(cx+50, cy+10, 30, 90);
+      ledCtx.strokeStyle = '#ff2d20'; ledCtx.lineWidth = 2;
+      ledCtx.beginPath();
+      ledCtx.moveTo(cx-80, cy-70); ledCtx.lineTo(cx-30, cy-70);
+      ledCtx.moveTo(cx+30, cy-70); ledCtx.lineTo(cx+80, cy-70);
+      ledCtx.moveTo(cx, cy-110); ledCtx.lineTo(cx, cy-90);
+      ledCtx.moveTo(cx, cy-50); ledCtx.lineTo(cx, cy-30);
+      ledCtx.stroke();
+      const m = 30;
+      ledCtx.strokeStyle = '#fff'; ledCtx.lineWidth = 3;
+      ledCtx.beginPath();
+      ledCtx.moveTo(m, m+50); ledCtx.lineTo(m, m); ledCtx.lineTo(m+50, m);
+      ledCtx.moveTo(w-m-50, m); ledCtx.lineTo(w-m, m); ledCtx.lineTo(w-m, m+50);
+      ledCtx.moveTo(m, h-m-50); ledCtx.lineTo(m, h-m); ledCtx.lineTo(m+50, h-m);
+      ledCtx.moveTo(w-m-50, h-m); ledCtx.lineTo(w-m, h-m); ledCtx.lineTo(w-m, h-m-50);
+      ledCtx.stroke();
+      ledCtx.fillStyle = '#ff2d20';
+      ledCtx.globalAlpha = 0.6 + Math.sin(t*4)*0.4;
+      ledCtx.beginPath(); ledCtx.arc(60, 60, 12, 0, Math.PI*2); ledCtx.fill();
+      ledCtx.globalAlpha = 1;
+      ledCtx.fillStyle = '#fff'; ledCtx.font = 'bold 22px monospace'; ledCtx.textAlign = 'left';
+      ledCtx.fillText('REC', 80, 68);
+      ledCtx.font = 'bold 22px monospace'; ledCtx.textAlign = 'right'; ledCtx.fillStyle = '#ff2d20';
+      const sec = Math.floor(t*25);
+      ledCtx.fillText(`00:00:${String(Math.floor(sec/25)%60).padStart(2,'0')}:${String(sec%25).padStart(2,'0')}`, w-30, 68);
+      ledCtx.font = '18px monospace'; ledCtx.textAlign = 'center'; ledCtx.fillStyle = '#888';
+      ledCtx.fillText('FEED 01 / CAM 04  ·  WORLD FEED  ·  1UP NETWORK', w/2, h - 40);
+    }
+    ledTexture.needsUpdate = true;
+  }
+
+  // ── Scroll + animation
+  const scrollTrack = document.querySelector('.scroll-track');
+  const overlays = [1,2,3,4,5,6].map(i => document.getElementById('overlay-' + i));
+  const countdownNum = document.getElementById('countdownNum');
+  const broadcastUI = document.getElementById('broadcastUI');
+  const tallyFlash = document.getElementById('tallyFlash');
+  const progressFill = document.getElementById('progressFill');
+  const tcEl = document.getElementById('tc');
+  const canvasStage = document.getElementById('canvasStage');
+  const topStatus = document.getElementById('topStatus');
+
+  let scrollProgress = 0;
+  function smoothstep(a, b, x) {
+    const t = Math.max(0, Math.min(1, (x-a)/(b-a)));
+    return t*t*(3-2*t);
+  }
+  function setOverlay(el, start, end) {
+    const o = smoothstep(start, start+0.04, scrollProgress) - smoothstep(end-0.04, end, scrollProgress);
+    el.style.opacity = Math.max(0, Math.min(1, o));
+    el.classList.toggle('show', o > 0.1);
+  }
+
+  function updateScroll() {
+    const max = scrollTrack.offsetHeight;
+    scrollProgress = Math.max(0, Math.min(1, scrollY / max));
+    progressFill.style.height = (scrollProgress * 100) + '%';
+
+    setOverlay(overlays[0], 0.00, 0.06);
+    setOverlay(overlays[1], 0.06, 0.20);
+    setOverlay(overlays[2], 0.22, 0.36);
+    setOverlay(overlays[3], 0.42, 0.60);
+    setOverlay(overlays[4], 0.66, 0.80);
+    setOverlay(overlays[5], 0.86, 0.99);
+
+    if (scrollProgress > 0.06 && scrollProgress < 0.20) {
+      const t = (scrollProgress - 0.06) / 0.14;
+      const n = Math.max(1, 3 - Math.floor(t * 3));
+      countdownNum.textContent = n;
+      countdownNum.classList.toggle('flash', n === 1);
+    }
+
+    const bcOpacity = smoothstep(0.42, 0.50, scrollProgress) - smoothstep(0.86, 0.95, scrollProgress);
+    broadcastUI.style.opacity = Math.max(0, Math.min(1, bcOpacity));
+    broadcastUI.classList.toggle('show', bcOpacity > 0.05);
+
+    let flash = 0;
+    if (scrollProgress > 0.40 && scrollProgress < 0.43) flash = Math.max(flash, 1 - (scrollProgress-0.40)/0.03);
+    if (scrollProgress > 0.66 && scrollProgress < 0.69) flash = Math.max(flash, 1 - (scrollProgress-0.66)/0.03);
+    tallyFlash.style.opacity = flash * 0.7;
+
+    canvasStage.classList.toggle('is-done', scrollProgress > 0.96);
+
+    // status label
+    if (scrollProgress < 0.20) topStatus.textContent = 'On air · Scene 01';
+    else if (scrollProgress < 0.42) topStatus.textContent = 'On air · Scene 02';
+    else if (scrollProgress < 0.66) topStatus.textContent = 'On air · Scene 03';
+    else if (scrollProgress < 0.85) topStatus.textContent = 'On air · Scene 04';
+    else topStatus.textContent = 'On air · Roll VT';
+  }
+
+  addEventListener('scroll', updateScroll, { passive: true });
+  addEventListener('resize', () => {
+    camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight); updateScroll();
+  });
+
+  document.getElementById('skipBtn').addEventListener('click', () => {
+    // jump straight to the reel
+    document.getElementById('reelSection').scrollIntoView({ behavior: 'smooth' });
+  });
+
+  function lerp(a, b, t) { return a + (b-a)*t; }
+  const clock = new THREE.Clock();
+
+  function animate() {
+    requestAnimationFrame(animate);
+    const t = clock.getElapsedTime();
+    const p = scrollProgress;
+
+    let posZ, posY, lookZ, lookY, lookX = 0;
+    const bob = Math.sin(t*4.5) * 0.05;
+    if (p < 0.32) {
+      const s = p / 0.32;
+      posZ = lerp(-45, -8, s); posY = 1.7 + bob;
+      lookZ = posZ + 12; lookY = 1.7;
+    } else if (p < 0.45) {
+      const s = (p-0.32) / 0.13;
+      posZ = lerp(-8, -2, s); posY = 1.7 + bob*(1-s);
+      lookZ = posZ + 12; lookY = lerp(1.7, 3.2, s);
+    } else if (p < 0.65) {
+      const s = (p-0.45) / 0.20;
+      posZ = lerp(-2, 7.5, s); posY = lerp(1.7, 2.3, s);
+      lookZ = lerp(10, 16, s); lookY = lerp(3.2, 5.5, s);
+    } else if (p < 0.82) {
+      posZ = 7.8 + Math.sin(t*0.6)*0.15;
+      posY = 2.3 + Math.sin(t*0.4)*0.05;
+      lookZ = 16; lookY = 5.8; lookX = Math.sin(t*0.5)*0.5;
+    } else {
+      const s = (p-0.82)/0.18;
+      posZ = lerp(7.8, 4, s); posY = lerp(2.3, 3.2, s);
+      lookZ = 16; lookY = 5.8;
+    }
+    camera.position.set(0 + Math.sin(t*1.2)*0.04, posY, posZ);
+    camera.lookAt(lookX, lookY, lookZ);
+
+    const stageIntensity = smoothstep(0.30, 0.55, p);
+    keyLight.intensity = stageIntensity * (1.6 + Math.sin(t*2.3)*0.35);
+    fillLight.intensity = stageIntensity * (1.3 + Math.sin(t*2.1+1.2)*0.3);
+    arenaLight.intensity = 0.2 + stageIntensity*0.4;
+    cone1.material.opacity = 0.08 * stageIntensity;
+    cone2.material.opacity = 0.08 * stageIntensity;
+    cone3.material.opacity = 0.05 * stageIntensity;
+    stageEdge.material.color.setHSL(0, 0.9, 0.35 + Math.sin(t*6)*0.15);
+
+    const swing = smoothstep(0.45, 0.62, p);
+    const tmp = new THREE.Vector3();
+    broadcastCams.forEach(cam => {
+      const target = tmp.set(camera.position.x, 1.9, camera.position.z);
+      const oldQ = cam.quaternion.clone();
+      cam.lookAt(target);
+      const trackedQ = cam.quaternion.clone();
+      cam.quaternion.copy(oldQ);
+      cam.quaternion.slerp(trackedQ, swing);
+      cam.userData.tally.material.color.setHSL(0, 1, 0.4 + swing*0.3);
+    });
+
+    if (p > 0.35) {
+      for (let i = 0; i < CROWD_COUNT; i++) {
+        const d = crowdData[i];
+        const j = Math.sin(t*6 + d.phase) * 0.06 * smoothstep(0.35, 0.6, p);
+        dummy.position.set(d.x, d.baseY + j, d.z);
+        dummy.scale.set(d.sx, d.sy, d.sz);
+        dummy.rotation.set(0, d.ry, 0);
+        dummy.updateMatrix();
+        crowd.setMatrixAt(i, dummy.matrix);
+      }
+      crowd.instanceMatrix.needsUpdate = true;
+    }
+
+    drawLED(p, t);
+
+    // ── Update all feeds + stage floor ──
+    Object.values(feeds).forEach(f => {
+      f.draw(f.ctx, t, FEED_W, FEED_H);
+      f.texture.needsUpdate = true;
+    });
+    drawStageFloor(t);
+
+    // ── Project hotspots to screen-space and update HTML positions ──
+    const tmpV = new THREE.Vector3();
+    hotspotDefs.forEach(h => {
+      tmpV.copy(h.pos).project(camera);
+      const inFront = tmpV.z > -1 && tmpV.z < 1;
+      const inFrame = tmpV.x > -0.95 && tmpV.x < 0.95 && tmpV.y > -0.85 && tmpV.y < 0.85;
+      // also reveal only after we're roughly in/around the arena scene
+      const phaseOK = (h.feedId === 'backstage') ? (p > 0.05 && p < 0.42) : (p > 0.42 && p < 0.92);
+      if (inFront && inFrame && phaseOK) {
+        const sx = (tmpV.x + 1) / 2 * innerWidth;
+        const sy = (1 - (tmpV.y + 1) / 2) * innerHeight;
+        h.el.style.left = sx + 'px';
+        h.el.style.top  = sy + 'px';
+        h.el.classList.add('visible');
+      } else {
+        h.el.classList.remove('visible');
+      }
+    });
+
+    if (broadcastUI.classList.contains('show')) {
+      const sec = Math.floor(t*25);
+      tcEl.textContent = `00:00:${String(Math.floor(sec/25)%60).padStart(2,'0')}:${String(sec%25).padStart(2,'0')}`;
+    }
+
+    renderer.render(scene, camera);
+  }
+
+  updateScroll();
+  animate();
+
+  // small nudge so user discovers scroll
+  setTimeout(() => {
+    if (scrollY < 5) {
+      scrollTo({ top: 1, behavior: 'smooth' });
+      setTimeout(() => scrollTo({ top: 0, behavior: 'smooth' }), 800);
+    }
+  }, 1500);
+})();
+
+// ════════════════════════════════════════════════════════════════
+//  FEED VIEWER MODAL — opens when a hotspot in the 3D scene is clicked
+// ════════════════════════════════════════════════════════════════
+(function() {
+  // Wait until feeds are populated by the 3D IIFE
+  function ready(cb) {
+    if (window._feeds && Object.keys(window._feeds).length) cb();
+    else setTimeout(() => ready(cb), 50);
+  }
+
+  ready(() => {
+    const feeds = window._feeds;
+    const viewer = document.getElementById('feedViewer');
+    const titleEl = document.getElementById('fvTitle');
+    const locEl = document.getElementById('fvLoc');
+    const tcEl = document.getElementById('fvTc');
+    const closeBtn = document.getElementById('fvClose');
+    const mainCanvas = document.getElementById('fvMain');
+    const mainCtx = mainCanvas.getContext('2d');
+    const thumbsEl = document.getElementById('fvThumbs');
+
+    let active = null;
+    let openedAt = 0;
+    const startClock = performance.now();
+
+    // Build thumbnails — one per feed
+    const thumbCanvases = {};
+    Object.values(feeds).forEach(f => {
+      const btn = document.createElement('button');
+      btn.className = 'fv-thumb';
+      btn.dataset.feedId = f.id;
+      const tc = document.createElement('canvas');
+      tc.width = 192; tc.height = 108;
+      btn.appendChild(tc);
+      const tag = document.createElement('span');
+      tag.className = 'fv-thumb-tag';
+      tag.textContent = f.label;
+      btn.appendChild(tag);
+      const live = document.createElement('span');
+      live.className = 'fv-thumb-live';
+      btn.appendChild(live);
+      btn.addEventListener('click', () => switchTo(f.id));
+      thumbsEl.appendChild(btn);
+      thumbCanvases[f.id] = { canvas: tc, ctx: tc.getContext('2d'), btn };
+    });
+
+    function switchTo(id) {
+      const feed = feeds[id];
+      if (!feed) return;
+      active = feed;
+      titleEl.textContent = feed.label;
+      locEl.textContent = feed.loc;
+      // mark active thumbnail
+      Object.entries(thumbCanvases).forEach(([fid, t]) => {
+        t.btn.classList.toggle('active', fid === id);
+      });
+      openedAt = performance.now();
+    }
+
+    window._launchFeed = function(feedId) {
+      switchTo(feedId);
+      viewer.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    };
+
+    function close() {
+      viewer.classList.remove('open');
+      document.body.style.overflow = '';
+      active = null;
+    }
+    closeBtn.addEventListener('click', close);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && viewer.classList.contains('open')) close();
+    });
+
+    // Render loop — copies feed canvases into modal main + thumbnails
+    function tick() {
+      requestAnimationFrame(tick);
+      // Always update thumbnails (they're cheap and look alive)
+      if (viewer.classList.contains('open')) {
+        Object.values(feeds).forEach(f => {
+          const t = thumbCanvases[f.id];
+          t.ctx.drawImage(f.canvas, 0, 0, t.canvas.width, t.canvas.height);
+        });
+        // main canvas: scale up the active feed
+        if (active) {
+          mainCtx.drawImage(active.canvas, 0, 0, mainCanvas.width, mainCanvas.height);
+          // local timecode (since modal opened)
+          const elapsed = (performance.now() - openedAt) / 1000;
+          const total = Math.floor(elapsed * 25);
+          const f = total % 25;
+          const sec = Math.floor(total / 25) % 60;
+          const min = Math.floor(total / 1500) % 60;
+          tcEl.textContent = `${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')}:${String(f).padStart(2,'0')}`;
+        }
+      }
+    }
+    tick();
+  });
+})();
+
+
+// ════════════════════════════════════════════════════════════════
+//  THE REEL — PLACEHOLDER ANIMATION
+//  (canvas-painted showreel: colour bars → countdown → title →
+//   6 animated clip cards → end card. ~37s loop.)
+//
+//  When you have the real showreel: swap the <canvas id="reelCanvas">
+//  in the HTML for a <video id="reelVideo"> and use the video-based
+//  version of this block (commented below).
+// ════════════════════════════════════════════════════════════════
+(function() {
+  const canvas = document.getElementById('reelCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const frame       = document.getElementById('reelFrame');
+  const playOverlay = document.getElementById('reelPlayOverlay');
+  const playBtn     = document.getElementById('reelPlayBtn');
+  const playIcon    = document.getElementById('reelPlayIcon');
+  const muteBtn     = document.getElementById('reelMuteBtn');
+  const fsBtn       = document.getElementById('reelFsBtn');
+  const progress    = document.getElementById('reelProgress');
+  const filled      = document.getElementById('reelFilled');
+  const scrub       = document.getElementById('reelScrub');
+  const timeEl      = document.getElementById('reelTime');
+  const tcEl        = document.getElementById('reelTc');
+  const vtDuration  = document.getElementById('vtDuration');
+
+  // ── Reel composition ──
+  const clips = [
+    { title: 'LEC FINALS',    sub: 'MUNICH · DE · 2024',      cat: 'ESPORTS · FINAL · RIOT',    pal: { a:'#1a0a2e', b:'#ff2d8a', c:'#00d4ff' } },
+    { title: 'LOL WORLDS',    sub: 'SEOUL · KR · 2023',       cat: 'ESPORTS · WORLDS · RIOT',   pal: { a:'#2e0a0a', b:'#c8002d', c:'#ffaa00' } },
+    { title: 'VCT CHAMPIONS', sub: 'LOS ANGELES · US · 2023', cat: 'ESPORTS · VALORANT',        pal: { a:'#0a0a2e', b:'#7c00ff', c:'#00ffaa' } },
+    { title: 'TOP GEAR',      sub: 'BBC · UK',                cat: 'BROADCAST · SERIES',        pal: { a:'#1a1a1a', b:'#b87333', c:'#3a8aa8' } },
+    { title: 'A$AP ROCKY',    sub: 'COACHELLA · 2016',        cat: 'LIVE · MUSIC',              pal: { a:'#0a0a0a', b:'#ff00aa', c:'#aa00ff' } },
+    { title: 'UFC',           sub: 'ESPN · MULTI-EVENT',      cat: 'BROADCAST · SPORT · LIVE',  pal: { a:'#1a0808', b:'#ff2d20', c:'#ffaa00' } },
+  ];
+
+  const scenes = [
+    { kind: 'bars',      dur: 3 },
+    { kind: 'countdown', dur: 2 },
+    { kind: 'title',     dur: 4 },
+    ...clips.map((_, i) => ({ kind: 'clip', dur: 4, clipIdx: i })),
+    { kind: 'end',       dur: 4 },
+  ];
+  let cum = 0;
+  scenes.forEach(s => { s.start = cum; cum += s.dur; });
+  const TOTAL = cum;
+
+  let playhead = 0;
+  let playing = false;
+  let lastT = performance.now();
+
+  function hexToRgba(hex, a) {
+    const r = parseInt(hex.slice(1,3), 16);
+    const g = parseInt(hex.slice(3,5), 16);
+    const b = parseInt(hex.slice(5,7), 16);
+    return `rgba(${r},${g},${b},${a})`;
+  }
+
+  function fmt(s) {
+    const m = Math.floor(s/60), r = Math.floor(s%60);
+    return `${String(m).padStart(2,'0')}:${String(r).padStart(2,'0')}`;
+  }
+  function fmtTC(s) {
+    const total = Math.floor(s * 25);
+    const f = total % 25;
+    const sec = Math.floor(total / 25) % 60;
+    const min = Math.floor(total / 1500) % 60;
+    return `${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')}:${String(f).padStart(2,'0')}`;
+  }
+
+  // ── SMPTE colour bars ──
+  function drawBars(t) {
+    const bars = ['#c8c800','#00c8c8','#00c800','#c800c8','#c80000','#0000c8','#080808'];
+    const bw = W / bars.length;
+    bars.forEach((c, i) => {
+      ctx.fillStyle = c;
+      ctx.globalAlpha = 0.55;
+      ctx.fillRect(i*bw, 0, bw, H*0.72);
+    });
+    ctx.globalAlpha = 1;
+    const pluge = ['#181818','#f0f0f0','#181818','#080808'];
+    const pw = W / pluge.length;
+    pluge.forEach((c, i) => { ctx.fillStyle = c; ctx.fillRect(i*pw, H*0.72, pw, H*0.1); });
+    ctx.fillStyle = '#050507'; ctx.fillRect(0, H*0.82, W, H*0.18);
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 80px monospace'; ctx.textAlign = 'center';
+    ctx.fillText('STANDBY', W/2, H*0.92);
+    ctx.fillStyle = '#ff2d20'; ctx.font = '28px monospace';
+    ctx.fillText('● 1UP NETWORK · WORLD FEED · ROLL VT', W/2, H*0.97);
+  }
+
+  // ── Countdown leader ──
+  function drawCountdown(t, dur) {
+    ctx.fillStyle = '#050507'; ctx.fillRect(0, 0, W, H);
+    const subT = t % 1;
+    // sweeping arc
+    ctx.strokeStyle = '#ff2d20'; ctx.lineWidth = 24;
+    ctx.beginPath();
+    ctx.arc(W/2, H/2, 280, -Math.PI/2, -Math.PI/2 + subT * Math.PI*2);
+    ctx.stroke();
+    // outer faint ring
+    ctx.strokeStyle = 'rgba(255, 45, 32, 0.25)'; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.arc(W/2, H/2, 280, 0, Math.PI*2); ctx.stroke();
+    // crosshair
+    ctx.strokeStyle = 'rgba(255, 45, 32, 0.9)'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(W/2 - 400, H/2); ctx.lineTo(W/2 + 400, H/2);
+    ctx.moveTo(W/2, H/2 - 400); ctx.lineTo(W/2, H/2 + 400);
+    ctx.stroke();
+    // number
+    const n = Math.max(1, Math.ceil(dur - t));
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 340px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(n, W/2, H/2 + 20);
+    ctx.textBaseline = 'alphabetic';
+  }
+
+  // ── Title card ──
+  function drawTitle(t, dur) {
+    const p = t / dur;
+    ctx.fillStyle = '#050507'; ctx.fillRect(0, 0, W, H);
+    const rad = ctx.createRadialGradient(W/2, H*0.6, 0, W/2, H*0.6, W*0.7);
+    rad.addColorStop(0, 'rgba(255, 45, 32, 0.35)');
+    rad.addColorStop(0.5, 'rgba(255, 45, 32, 0.1)');
+    rad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = rad; ctx.fillRect(0, 0, W, H);
+    // drifting highlight
+    const lx = W/2 + Math.sin(t*0.8) * 220;
+    const ly = H/2 + Math.cos(t*0.6) * 110;
+    const lg = ctx.createRadialGradient(lx, ly, 0, lx, ly, 420);
+    lg.addColorStop(0, 'rgba(255, 210, 160, 0.25)');
+    lg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = lg; ctx.fillRect(0, 0, W, H);
+
+    const slide = Math.min(1, p * 4);
+    ctx.globalAlpha = slide;
+    const offX = (1 - slide) * -200;
+
+    // "1" + "UP" composed with different fonts
+    ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle';
+    ctx.font = 'bold 420px sans-serif';
+    const w1 = ctx.measureText('1').width;
+    ctx.font = 'italic 420px serif';
+    const w2 = ctx.measureText('UP').width;
+    const totalW = w1 + w2 + 20;
+    ctx.textAlign = 'left';
+    ctx.font = 'bold 420px sans-serif';
+    ctx.fillText('1', W/2 - totalW/2 + offX, H/2);
+    ctx.font = 'italic 420px serif';
+    ctx.fillText('UP', W/2 - totalW/2 + w1 + 20 + offX, H/2);
+    ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'center';
+
+    ctx.globalAlpha = Math.max(0, slide - 0.5) * 2;
+    ctx.fillStyle = '#ff2d20'; ctx.fillRect(W/2 - 80, H*0.8, 160, 3);
+    ctx.fillStyle = '#aaa'; ctx.font = '28px monospace';
+    ctx.fillText('THE REEL · 2024', W/2, H*0.85);
+    ctx.globalAlpha = 1;
+  }
+
+  // ── Clip card ──
+  function drawClip(t, dur, clip, idx, total) {
+    const p = t / dur;
+    ctx.fillStyle = clip.pal.a; ctx.fillRect(0, 0, W, H);
+
+    const lx1 = W * (0.3 + Math.sin(t*0.6)*0.15);
+    const ly1 = H * (0.4 + Math.cos(t*0.5)*0.12);
+    const g1 = ctx.createRadialGradient(lx1, ly1, 0, lx1, ly1, W*0.5);
+    g1.addColorStop(0, hexToRgba(clip.pal.b, 0.6));
+    g1.addColorStop(0.5, hexToRgba(clip.pal.b, 0.15));
+    g1.addColorStop(1, hexToRgba(clip.pal.b, 0));
+    ctx.fillStyle = g1; ctx.fillRect(0, 0, W, H);
+
+    const lx2 = W * (0.7 + Math.cos(t*0.4)*0.15);
+    const ly2 = H * (0.6 + Math.sin(t*0.7)*0.12);
+    const g2 = ctx.createRadialGradient(lx2, ly2, 0, lx2, ly2, W*0.45);
+    g2.addColorStop(0, hexToRgba(clip.pal.c, 0.45));
+    g2.addColorStop(0.5, hexToRgba(clip.pal.c, 0.10));
+    g2.addColorStop(1, hexToRgba(clip.pal.c, 0));
+    ctx.fillStyle = g2; ctx.fillRect(0, 0, W, H);
+
+    // bokeh orbs
+    for (let i = 0; i < 10; i++) {
+      const seed = i * 7919;
+      const ox = ((seed + t * 40) % (W + 200)) - 100;
+      const oy = H * 0.3 + Math.sin(t + i*0.5) * 80 + (seed % 200);
+      const or = 35 + (seed % 45);
+      const og = ctx.createRadialGradient(ox, oy, 0, ox, oy, or);
+      og.addColorStop(0, hexToRgba(clip.pal.b, 0.3));
+      og.addColorStop(1, hexToRgba(clip.pal.b, 0));
+      ctx.fillStyle = og; ctx.fillRect(ox - or, oy - or, or*2, or*2);
+    }
+
+    // vignette
+    const vg = ctx.createRadialGradient(W/2, H/2, W*0.3, W/2, H/2, W*0.7);
+    vg.addColorStop(0, 'rgba(0,0,0,0)');
+    vg.addColorStop(1, 'rgba(0,0,0,0.6)');
+    ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+
+    // title in/out
+    let titleAlpha = 1, titleOffsetX = 0;
+    if (p < 0.15) {
+      titleAlpha = p / 0.15;
+      titleOffsetX = (1 - p/0.15) * -80;
+    } else if (p > 0.85) {
+      titleAlpha = Math.max(0, (1 - p) / 0.15);
+    }
+    ctx.globalAlpha = titleAlpha;
+
+    // clip counter
+    ctx.fillStyle = '#ff2d20'; ctx.fillRect(80, 80, 6, 80);
+    ctx.fillStyle = '#fff'; ctx.font = '22px monospace'; ctx.textAlign = 'left';
+    ctx.fillText(`CLIP ${String(idx+1).padStart(2,'0')} / ${String(total).padStart(2,'0')}`, 100, 108);
+    ctx.fillStyle = '#ff2d20'; ctx.font = '18px monospace';
+    ctx.fillText(clip.cat, 100, 140);
+
+    // big title
+    ctx.fillStyle = '#fff';
+    ctx.font = 'italic 180px serif';
+    ctx.fillText(clip.title, 100 + titleOffsetX, H * 0.78);
+
+    ctx.fillStyle = '#ff2d20';
+    ctx.fillRect(100 + titleOffsetX, H * 0.80, 40, 3);
+    ctx.fillStyle = '#fff'; ctx.font = '28px monospace';
+    ctx.fillText(clip.sub, 100 + titleOffsetX, H * 0.86);
+
+    ctx.globalAlpha = 1;
+
+    // REC dot + TC top-right
+    ctx.fillStyle = '#ff2d20';
+    ctx.globalAlpha = 0.6 + Math.sin(t*4)*0.4;
+    ctx.beginPath(); ctx.arc(W - 240, 100, 11, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 22px monospace'; ctx.textAlign = 'left';
+    ctx.fillText('REC', W - 220, 108);
+    ctx.fillStyle = '#ff2d20'; ctx.font = 'bold 22px monospace'; ctx.textAlign = 'right';
+    ctx.fillText(fmtTC(playhead), W - 80, 108);
+  }
+
+  // ── End card ──
+  function drawEnd(t, dur) {
+    ctx.fillStyle = '#050507'; ctx.fillRect(0, 0, W, H);
+    const grad = ctx.createRadialGradient(W/2, H*0.5, 0, W/2, H*0.5, W*0.7);
+    grad.addColorStop(0, 'rgba(255, 45, 32, 0.22)');
+    grad.addColorStop(0.5, 'rgba(255, 45, 32, 0.05)');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
+
+    ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle';
+    ctx.font = 'bold 300px sans-serif';
+    const w1 = ctx.measureText('1').width;
+    ctx.font = 'italic 300px serif';
+    const w2 = ctx.measureText('UP').width;
+    const totalW = w1 + w2 + 20;
+    ctx.textAlign = 'left';
+    ctx.font = 'bold 300px sans-serif';
+    ctx.fillText('1', W/2 - totalW/2, H/2);
+    ctx.font = 'italic 300px serif';
+    ctx.fillText('UP', W/2 - totalW/2 + w1 + 20, H/2);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+
+    ctx.fillStyle = '#ff2d20'; ctx.font = '32px monospace';
+    ctx.fillText('BUILT FOR THE GLOBAL STAGE', W/2, H/2 + 140);
+    ctx.fillStyle = '#888'; ctx.font = '22px monospace';
+    ctx.fillText('1UP NETWORK · WORLD FEED · 2024', W/2, H/2 + 180);
+    ctx.fillStyle = '#fff'; ctx.font = '26px monospace';
+    ctx.fillText('hello@1up.tv  ·  Soho, London W1', W/2, H * 0.88);
+  }
+
+  // ── Cut flash at scene boundaries ──
+  function drawCutFlash() {
+    for (const s of scenes) {
+      const dt = playhead - s.start;
+      if (dt > 0 && dt < 0.08) {
+        ctx.fillStyle = 'rgba(255, 45, 32, 0.35)';
+        ctx.fillRect(0, 0, W, H);
+      }
+    }
+  }
+
+  function render() {
+    const scene = scenes.find(s => playhead >= s.start && playhead < s.start + s.dur) || scenes[0];
+    const local = playhead - scene.start;
+    if (scene.kind === 'bars')       drawBars(local);
+    else if (scene.kind === 'countdown') drawCountdown(local, scene.dur);
+    else if (scene.kind === 'title')     drawTitle(local, scene.dur);
+    else if (scene.kind === 'clip')      drawClip(local, scene.dur, clips[scene.clipIdx], scene.clipIdx, clips.length);
+    else if (scene.kind === 'end')       drawEnd(local, scene.dur);
+    drawCutFlash();
+  }
+
+  function tick(now) {
+    requestAnimationFrame(tick);
+    const dt = (now - lastT) / 1000;
+    lastT = now;
+    if (playing && dt < 0.1) playhead = (playhead + dt) % TOTAL;
+    render();
+
+    const ratio = playhead / TOTAL;
+    if (filled) filled.style.width = (ratio*100) + '%';
+    if (scrub)  scrub.style.left = (ratio*100) + '%';
+    const txt = `${fmt(playhead)} / ${fmt(TOTAL)}`;
+    if (timeEl) timeEl.textContent = txt;
+    if (tcEl)   tcEl.textContent   = txt;
+  }
+
+  if (vtDuration) vtDuration.textContent = fmt(TOTAL);
+
+  function togglePlay() {
+    playing = !playing;
+    if (playing) {
+      playOverlay && playOverlay.classList.add('gone');
+      if (playIcon) playIcon.innerHTML = '<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>';
+    } else {
+      if (playIcon) playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
+    }
+  }
+
+  playOverlay && playOverlay.addEventListener('click', togglePlay);
+  playBtn && playBtn.addEventListener('click', togglePlay);
+  canvas.addEventListener('click', togglePlay);
+
+  if (fsBtn) {
+    fsBtn.addEventListener('click', () => {
+      if (frame.requestFullscreen) frame.requestFullscreen();
+      else if (frame.webkitRequestFullscreen) frame.webkitRequestFullscreen();
+    });
+  }
+
+  if (progress) {
+    progress.addEventListener('click', (e) => {
+      const rect = progress.getBoundingClientRect();
+      const r = (e.clientX - rect.left) / rect.width;
+      playhead = Math.max(0, Math.min(TOTAL - 0.01, r * TOTAL));
+    });
+  }
+
+  // Mute button is decorative (canvas has no audio) but keep the UI
+  if (muteBtn) {
+    let uiMuted = true;
+    muteBtn.addEventListener('click', () => {
+      uiMuted = !uiMuted;
+      muteBtn.style.opacity = uiMuted ? '1' : '0.5';
+    });
+  }
+
+  // autoplay on intersection
+  if (frame) {
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting && e.intersectionRatio > 0.5) {
+          if (!playing) togglePlay();
+        } else if (!e.isIntersecting) {
+          if (playing) togglePlay();
+        }
+      });
+    }, { threshold: [0.5] });
+    io.observe(frame);
+  }
+
+  tick(performance.now());
+})();
+</script>
+</body>
+</html>
