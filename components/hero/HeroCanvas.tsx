@@ -38,23 +38,16 @@ function CameraController({ scrollProgress }: { scrollProgress: number }) {
       posY = THREE.MathUtils.lerp(1.7, 2.3, s);
       lookZ = THREE.MathUtils.lerp(10, 16, s);
       lookY = THREE.MathUtils.lerp(3.2, 5.5, s);
-    } else if (p < 0.78) {
-      // Phase 4: On stage / broadcast (65-78%)
+    } else if (p < 0.75) {
+      // Phase 4: On stage / broadcast (65-75%)
       posZ = 7.8 + Math.sin(t * 0.6) * 0.15;
       posY = 2.3 + Math.sin(t * 0.4) * 0.05;
       lookZ = 16;
       lookY = 5.8;
       lookX = Math.sin(t * 0.5) * 0.5;
-    } else if (p < 0.85) {
-      // Phase 5: Transition to stadium (78-85%)
-      const s = (p - 0.78) / 0.07;
-      posZ = THREE.MathUtils.lerp(7.8, 15, s);
-      posY = THREE.MathUtils.lerp(2.3, 8, s);
-      lookZ = THREE.MathUtils.lerp(16, 25, s);
-      lookY = THREE.MathUtils.lerp(5.8, 6, s);
     } else if (p < 0.95) {
-      // Phase 6: Stadium exploration (85-95%)
-      const s = (p - 0.85) / 0.10;
+      // Phase 5: Stadium exploration (75-95%) - immersive esports stadium experience
+      const s = (p - 0.75) / 0.20;
       const angle = s * Math.PI * 0.8 - Math.PI * 0.4; // Sweep around stadium
       const radius = 20;
       const x = Math.cos(angle) * radius;

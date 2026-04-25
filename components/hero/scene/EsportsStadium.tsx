@@ -135,8 +135,15 @@ export function EsportsStadium({ scrollProgress }: { scrollProgress: number }) {
 
   // Visibility based on scroll progress - stadium appears after main stage experience
   const stadiumOpacity = useMemo(() => {
-    // Stadium becomes visible after the main experience (after 85% scroll)
-    return Math.max(0, Math.min(1, (scrollProgress - 0.85) / 0.15));
+    // Stadium becomes visible after the main experience (after 75% scroll - earlier for better UX)
+    const opacity = Math.max(0, Math.min(1, (scrollProgress - 0.75) / 0.20));
+    
+    // Debug logging
+    if (scrollProgress > 0.7 && scrollProgress < 1) {
+      console.log('[EsportsStadium] scroll:', Math.round(scrollProgress * 100) + '%', 'opacity:', Math.round(opacity * 100) + '%');
+    }
+    
+    return opacity;
   }, [scrollProgress]);
 
   useFrame(() => {
