@@ -96,17 +96,28 @@ export function makeVideoEl(urlList: string[] | string): HTMLVideoElement {
     setTimeout(tryNext, 500);
   });
   
-  // User gesture detection for autoplay
+  // Enhanced user gesture detection for autoplay - more aggressive for mobile
+  let gestureDetected = false;
   const onGesture = () => {
-    if (v.paused) v.play()?.catch(() => {});
+    if (gestureDetected) return;
+    gestureDetected = true;
+    
+    if (v.paused) {
+      v.play()?.catch(() => {
+        console.warn('[1UP] video play failed after gesture:', v.src.split('/').pop());
+      });
+    }
+    
     document.removeEventListener('click', onGesture);
     document.removeEventListener('scroll', onGesture);
     document.removeEventListener('touchstart', onGesture);
+    document.removeEventListener('keydown', onGesture);
   };
   
   document.addEventListener('click', onGesture, { passive: true });
   document.addEventListener('scroll', onGesture, { passive: true });
   document.addEventListener('touchstart', onGesture, { passive: true });
+  document.addEventListener('keydown', onGesture, { passive: true });
   
   tryNext();
   return v;

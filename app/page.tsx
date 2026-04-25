@@ -1,5 +1,9 @@
 'use client';
 import dynamic from 'next/dynamic';
+import { RollVtTransition } from '@/components/reel/RollVtTransition';
+import { Reel } from '@/components/reel/Reel';
+import { PortfolioGrid } from '@/components/portfolio/PortfolioGrid';
+import { DualCta } from '@/components/portfolio/DualCta';
 
 // Dynamic import the hero experience to avoid SSR issues with three.js
 const HeroExperience = dynamic(() => import('@/components/hero/HeroExperience').then(mod => ({ default: mod.HeroExperience })), { 
@@ -12,15 +16,27 @@ export default function HomePage() {
     <main className="relative min-h-screen bg-bg text-text">
       <HeroExperience />
       
-      {/* Placeholder content after hero */}
-      <section className="relative z-10 min-h-screen bg-bg-2 p-8">
-        <div className="max-w-4xl mx-auto pt-20">
-          <h2 className="font-serif text-4xl mb-6">The Reel</h2>
-          <p className="font-sans text-text-dim">
-            3D hero experience complete. Additional sections (reel, portfolio) to be implemented.
+      {/* Roll VT transition */}
+      <RollVtTransition />
+      
+      {/* The Reel - video player section */}
+      <Reel />
+      
+      {/* Portfolio Grid */}
+      <PortfolioGrid />
+      
+      {/* Dual CTA */}
+      <DualCta />
+      
+      {/* Footer */}
+      <footer className="relative z-10 bg-bg border-t border-line py-12">
+        <div className="max-w-4xl mx-auto px-8 text-center">
+          <div className="font-serif text-xl italic mb-4">1<span className="font-sans font-bold">UP</span></div>
+          <p className="font-mono text-xs uppercase tracking-wider text-text-dim">
+            Productions &middot; Est. 2015 &middot; UK
           </p>
         </div>
-      </section>
+      </footer>
     </main>
   );
 }
