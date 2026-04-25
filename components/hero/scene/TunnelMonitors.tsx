@@ -1,11 +1,24 @@
 import * as THREE from 'three';
 
 export function TunnelMonitors({ backstageFeedTexture }: { backstageFeedTexture?: THREE.Texture }) {
-  const monitorPositions: Array<[number, number, number, 'right' | 'left']> = [
-    [-3.45, 2.0, -42, 'right'], [3.45, 2.0, -42, 'left'],
-    [-3.45, 2.0, -28, 'right'], [3.45, 2.0, -28, 'left'],
-    [-3.45, 2.0, -14, 'right'], [3.45, 2.0, -14, 'left'],
-  ];
+  // Create a dense array of monitors for immersive video corridor
+  const monitorPositions: Array<[number, number, number, 'right' | 'left']> = [];
+  
+  // Generate monitors along tunnel length with multiple heights
+  for (let z = -44; z <= -6; z += 4) {
+    // Higher monitors
+    monitorPositions.push([-3.45, 3.2, z, 'right'], [3.45, 3.2, z, 'left']);
+    // Mid-level monitors (original height)
+    monitorPositions.push([-3.45, 2.0, z, 'right'], [3.45, 2.0, z, 'left']);
+    // Lower monitors
+    monitorPositions.push([-3.45, 0.8, z, 'right'], [3.45, 0.8, z, 'left']);
+  }
+  
+  // Add some staggered monitors for variety
+  for (let z = -42; z <= -8; z += 6) {
+    monitorPositions.push([-3.45, 1.4, z, 'right'], [3.45, 1.4, z, 'left']);
+    monitorPositions.push([-3.45, 2.6, z, 'right'], [3.45, 2.6, z, 'left']);
+  }
 
   return (
     <group>

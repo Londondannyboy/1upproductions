@@ -11,6 +11,20 @@ export const VIDEO_SOURCES = {
     'https://threejs.org/examples/textures/sintel.mp4',
   ],
   
+  // Arena video content - varied sources for collage effect
+  arena_main: [
+    'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+    'https://threejs.org/examples/textures/sintel.mp4',
+  ],
+  arena_side: [
+    'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+    'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
+  ],
+  arena_upper: [
+    'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    'https://threejs.org/examples/textures/sintel.mp4',
+  ],
+  
   // Esports stadium seating videos - 1UP filming competitions
   esports1: [
     'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',

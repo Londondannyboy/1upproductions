@@ -11,6 +11,7 @@ import { Crowd } from './scene/Crowd';
 import { BroadcastCameras } from './scene/BroadcastCameras';
 import { TunnelMonitors } from './scene/TunnelMonitors';
 import { FloorPanels } from './scene/FloorPanels';
+import { ArenaVideoScreens } from './scene/ArenaVideoScreens';
 
 import { VIDEO_SOURCES, makeVideoEl } from '@/lib/videoSources';
 import { drawBackstageFeed } from '@/components/feeds/feedCanvases/drawBackstageFeed';
@@ -23,9 +24,15 @@ export function Scene({ scrollProgress }: { scrollProgress: number }) {
   // Video elements and textures
   const [backstageVideo, setBackstageVideo] = useState<HTMLVideoElement | null>(null);
   const [floorVideo, setFloorVideo] = useState<HTMLVideoElement | null>(null);
+  const [arenaMainVideo, setArenaMainVideo] = useState<HTMLVideoElement | null>(null);
+  const [arenaSideVideo, setArenaSideVideo] = useState<HTMLVideoElement | null>(null);
+  const [arenaUpperVideo, setArenaUpperVideo] = useState<HTMLVideoElement | null>(null);
   
   const [backstageTexture, setBackstageTexture] = useState<THREE.Texture | null>(null);
   const [floorVideoTexture, setFloorVideoTexture] = useState<THREE.Texture | null>(null);
+  const [arenaMainTexture, setArenaMainTexture] = useState<THREE.Texture | null>(null);
+  const [arenaSideTexture, setArenaSideTexture] = useState<THREE.Texture | null>(null);
+  const [arenaUpperTexture, setArenaUpperTexture] = useState<THREE.Texture | null>(null);
   
   // Backstage feed canvas for CCTV overlay
   const [backstageCanvas] = useState(() => {
@@ -45,9 +52,15 @@ export function Scene({ scrollProgress }: { scrollProgress: number }) {
   useEffect(() => {
     const backstageVid = makeVideoEl(VIDEO_SOURCES.backstage);
     const floorVid = makeVideoEl(VIDEO_SOURCES.floor);
+    const arenaMainVid = makeVideoEl(VIDEO_SOURCES.arena_main);
+    const arenaSideVid = makeVideoEl(VIDEO_SOURCES.arena_side);
+    const arenaUpperVid = makeVideoEl(VIDEO_SOURCES.arena_upper);
     
     setBackstageVideo(backstageVid);
     setFloorVideo(floorVid);
+    setArenaMainVideo(arenaMainVid);
+    setArenaSideVideo(arenaSideVid);
+    setArenaUpperVideo(arenaUpperVid);
     
     // Create video textures
     const backstageTex = new THREE.VideoTexture(backstageVid);
@@ -62,13 +75,30 @@ export function Scene({ scrollProgress }: { scrollProgress: number }) {
     floorTex.format = THREE.RGBAFormat;
     setFloorVideoTexture(floorTex);
     
+    const arenaMainTex = new THREE.VideoTexture(arenaMainVid);
+    arenaMainTex.minFilter = THREE.LinearFilter;
+    arenaMainTex.magFilter = THREE.LinearFilter;
+    arenaMainTex.format = THREE.RGBAFormat;
+    setArenaMainTexture(arenaMainTex);
+    
+    const arenaSideTex = new THREE.VideoTexture(arenaSideVid);
+    arenaSideTex.minFilter = THREE.LinearFilter;
+    arenaSideTex.magFilter = THREE.LinearFilter;
+    arenaSideTex.format = THREE.RGBAFormat;
+    setArenaSideTexture(arenaSideTex);
+    
+    const arenaUpperTex = new THREE.VideoTexture(arenaUpperVid);
+    arenaUpperTex.minFilter = THREE.LinearFilter;
+    arenaUpperTex.magFilter = THREE.LinearFilter;
+    arenaUpperTex.format = THREE.RGBAFormat;
+    setArenaUpperTexture(arenaUpperTex);
+    
     return () => {
-      if (backstageVid.parentNode) {
-        backstageVid.parentNode.removeChild(backstageVid);
-      }
-      if (floorVid.parentNode) {
-        floorVid.parentNode.removeChild(floorVid);
-      }
+      [backstageVid, floorVid, arenaMainVid, arenaSideVid, arenaUpperVid].forEach(vid => {
+        if (vid.parentNode) {
+          vid.parentNode.removeChild(vid);
+        }
+      });
     };
   }, []);
 
@@ -163,6 +193,12 @@ export function Scene({ scrollProgress }: { scrollProgress: number }) {
       />
       <TunnelMonitors backstageFeedTexture={backstageFeedTexture} />
       <FloorPanels floorVideoTexture={floorVideoTexture || undefined} />
+      <ArenaVideoScreens 
+        arenaMainTexture={arenaMainTexture || undefined}
+        arenaSideTexture={arenaSideTexture || undefined}
+        arenaUpperTexture={arenaUpperTexture || undefined}
+        scrollProgress={scrollProgress}
+      />
     </group>
   );
 }
