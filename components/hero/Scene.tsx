@@ -11,7 +11,7 @@ import { Crowd } from './scene/Crowd';
 import { BroadcastCameras } from './scene/BroadcastCameras';
 import { TunnelMonitors } from './scene/TunnelMonitors';
 import { FloorPanels } from './scene/FloorPanels';
-import { EsportsStadium } from './scene/EsportsStadium';
+// import { EsportsStadium } from './scene/EsportsStadium';
 // import { StadiumHotspots } from './StadiumHotspots';
 
 import { VIDEO_SOURCES, makeVideoEl } from '@/lib/videoSources';
@@ -144,7 +144,7 @@ export function Scene({ scrollProgress }: { scrollProgress: number }) {
       />
       <TunnelMonitors backstageFeedTexture={backstageTexture || undefined} />
       <FloorPanels floorVideoTexture={floorVideoTexture || undefined} />
-      <EsportsStadium scrollProgress={scrollProgress} />
+      {/* <EsportsStadium scrollProgress={scrollProgress} /> */}
       {/* <StadiumHotspots scrollProgress={scrollProgress} /> */}
     </group>
   );
