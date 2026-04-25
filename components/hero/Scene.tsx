@@ -115,7 +115,7 @@ export function Scene({ scrollProgress }: { scrollProgress: number }) {
     // Update backstage feed canvas with CCTV overlay
     const ctx = backstageCanvas.getContext('2d');
     if (ctx) {
-      drawBackstageFeed(ctx, t, backstageCanvas.width, backstageCanvas.height, backstageVideo);
+      drawBackstageFeed(ctx, t, backstageCanvas.width, backstageCanvas.height, backstageVideo || undefined);
       backstageFeedTexture.needsUpdate = true;
     }
     
